@@ -25,3 +25,17 @@
 
 - Conventional Commits: `feat: …`, `fix: …`, `chore: …`, `docs: …`; описание на русском. В теле кратко перечисли изменения.
 - Создавай коммиты с `git commit --no-gpg-sign …`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues живут в GitHub Issues этого репозитория (через `gh` CLI). Подробности: `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Дефолтный словарь из пяти канонических ролей (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Подробности: `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` в корне репозитория. Подробности: `docs/agents/domain.md`.
