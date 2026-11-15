@@ -15,6 +15,7 @@
     "lint": "oxlint --deny-warnings .",
     "typecheck": "tsc -p tsconfig.tools.json && yarn workspaces foreach -A --exclude calendar run typecheck",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "build": "yarn workspace @calendar/api build && yarn workspace @calendar/web build",
     "check": "node scripts/check.mjs",
     "fix": "yarn format",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
+    "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",
     "@typescript/native": "npm:typescript@7.0.2",
     "@typespec/compiler": "1.18.0",
