@@ -48,7 +48,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@calendar/web@workspace:apps/web"
   dependencies:
-    "@calendar/api-client": "workspace:*"
     "@mantine/core": "npm:9.8.0"
     "@mantine/hooks": "npm:9.8.0"
     "@types/node": "npm:26.6.6"
@@ -60,6 +59,7 @@ __metadata:
     postcss-simple-vars: "npm:7.0.1"
     react: "npm:19.3.1"
     react-dom: "npm:19.3.1"
+    react-router: "npm:8.5.1"
     typescript: "npm:7.0.2"
     vite: "npm:8.3.8"
   languageName: unknown
@@ -1249,6 +1249,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@playwright/test@npm:1.65.1":
+  version: 1.65.1
+  resolution: "@playwright/test@npm:1.65.1"
+  dependencies:
+    playwright: "npm:1.65.1"
+  bin:
+    playwright: cli.js
+  checksum: 10c0/f3c0c6ce1d426c84c2ee370e7b7a81fcd4a7a8eaa9d51a880ec853e98ce437482772a09c58c7fbb4444002b127068f076458bec99cecca60c3b51e9ba93e2cc6
+  languageName: node
+  linkType: hard
+
+"@remix-run/route-pattern@npm:^0.22.1":
+  version: 0.22.1
+  resolution: "@remix-run/route-pattern@npm:0.22.1"
+  checksum: 10c0/752fd1b76ce5c1c40648ab6a731c18b88ecd16e43d4333a7eb724c852df775761ed70d0caef7da7d2360425886d62b5d6d47e707f15bc922669d1c66b757cd33
+  languageName: node
+  linkType: hard
+
 "@rolldown/binding-android-arm-eabi@npm:1.2.19":
   version: 1.2.19
   resolution: "@rolldown/binding-android-arm-eabi@npm:1.2.19"
@@ -2123,6 +2141,7 @@ __metadata:
   resolution: "calendar@workspace:."
   dependencies:
     "@hey-api/openapi-ts": "npm:0.99.0"
+    "@playwright/test": "npm:1.65.1"
     "@types/node": "npm:26.6.6"
     "@typescript/native": "npm:typescript@7.0.2"
     "@typespec/compiler": "npm:1.18.0"
@@ -2255,6 +2274,13 @@ __metadata:
   version: 0.3.2
   resolution: "confbox@npm:0.3.2"
   checksum: 10c0/596716d50e60c42d60e54432d843dbc38778f67c050abcb717dcdbdfc959b7d4f3fa4ff835a5dc4eaca8fcec9ef242964894d5d8039307d2cb34e17b72eacfd4
+  languageName: node
+  linkType: hard
+
+"cookie-es@npm:^3.1.1":
+  version: 3.1.1
+  resolution: "cookie-es@npm:3.1.1"
+  checksum: 10c0/62cf0c325cc547b52477b351e9b5d068b3ffc74f7d143cdf7af854648dd1015fca3aed1498b355365e24b0746333f0b15688ed3a535abecc5ed0a046ae956a84
   languageName: node
   linkType: hard
 
@@ -3672,6 +3698,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"playwright-core@npm:1.65.1":
+  version: 1.65.1
+  resolution: "playwright-core@npm:1.65.1"
+  bin:
+    playwright-core: cli.js
+  checksum: 10c0/4406d4f8eff668a93aaada8382d25fcce8da5f679e9f31311888178d631ed0270eb40c0288129e41e15709c957a31932cac9753fdb332547a19bc3541d317e44
+  languageName: node
+  linkType: hard
+
+"playwright@npm:1.65.1":
+  version: 1.65.1
+  resolution: "playwright@npm:1.65.1"
+  dependencies:
+    playwright-core: "npm:1.65.1"
+  bin:
+    playwright: cli.js
+  checksum: 10c0/30ce029c9fb2a6e88cf81b150b978fd60edb59b8af5a6460f5576f0fe6e2bb739454109f0ce4904eac63cb2cf10390518d7d71d335fd695b5897734a5af7250d
+  languageName: node
+  linkType: hard
+
 "postcss-js@npm:^4.0.1":
   version: 4.1.0
   resolution: "postcss-js@npm:4.1.0"
@@ -3859,6 +3905,28 @@ __metadata:
     "@types/react":
       optional: true
   checksum: 10c0/b5f3315bead75e72853f492c0b51ba8fb4fa09a4534d7fc42d6fcd59ca3e047cf213279ffc1e35b337e314ef5a04cb2b12544c85e0078802271731c27c09e5aa
+  languageName: node
+  linkType: hard
+
+"react-router@npm:8.5.1":
+  version: 8.5.1
+  resolution: "react-router@npm:8.5.1"
+  dependencies:
+    "@remix-run/route-pattern": "npm:^0.22.1"
+    cookie-es: "npm:^3.1.1"
+  peerDependencies:
+    "@types/react": ">=19.2.0"
+    "@types/react-dom": ">=19.2.0"
+    react: ">=19.2.7"
+    react-dom: ">=19.2.7"
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+    "@types/react-dom":
+      optional: true
+    react-dom:
+      optional: true
+  checksum: 10c0/07503a26d5c5669d84d044e59e3a7f97dad36946dbb9ade14f243f187096bc12cea5bf7401f8681c602d9100238cef752bd3d0e6a742e1c0794e2abd20662368
   languageName: node
   linkType: hard
 

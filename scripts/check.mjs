@@ -20,6 +20,7 @@ const commands = [
   ],
   ['yarn', ['test']],
   ['yarn', ['build']],
+  ['yarn', ['test:e2e']],
 ];
 
 for (const [command, args] of commands) {

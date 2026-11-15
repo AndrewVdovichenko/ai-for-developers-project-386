@@ -26,8 +26,13 @@ ready_port = 5173
 depends = ["api"]
 
 [tasks.setup]
-description = "Установить зависимости, сгенерировать SDK и подключить git-хуки"
-run = ["yarn install --immutable", "yarn generate", "hk install --mise"]
+description = "Установить зависимости, сгенерировать SDK, скачать браузер e2e и подключить git-хуки"
+run = [
+  "yarn install --immutable",
+  "yarn generate",
+  "yarn playwright install chromium",
+  "hk install --mise",
+]
 
 [tasks.dev]
 description = "Запустить серверы разработки"
@@ -47,6 +52,14 @@ run = "yarn generate"
 
 [tasks.build]
 run = "yarn build"
+
+[tasks.test]
+description = "Запустить Vitest: API-smoke"
+run = "yarn test"
+
+[tasks."test:e2e"]
+description = "Собрать фронтенд и прогнать Playwright e2e"
+run = ["yarn build", "yarn test:e2e"]
 
 [tasks.check]
 run = "yarn check"
