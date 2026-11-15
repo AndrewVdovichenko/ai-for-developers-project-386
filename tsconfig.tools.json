@@ -6,5 +6,10 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["openapi-ts.config.ts", "vitest.config.ts"]
+  "include": [
+    "openapi-ts.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "apps/web/e2e/**/*.spec.ts"
+  ]
 }
