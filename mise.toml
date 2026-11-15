@@ -53,6 +53,14 @@ run = "yarn generate"
 [tasks.build]
 run = "yarn build"
 
+[tasks.test]
+description = "Запустить Vitest: API-smoke"
+run = "yarn test"
+
+[tasks."test:e2e"]
+description = "Собрать фронтенд и прогнать Playwright e2e"
+run = ["yarn build", "yarn test:e2e"]
+
 [tasks.check]
 run = "yarn check"
 

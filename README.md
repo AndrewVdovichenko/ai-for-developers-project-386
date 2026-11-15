@@ -60,7 +60,7 @@ mise run setup
 ```
 
 `setup` устанавливает зависимости по lock-файлу, генерирует SDK, скачивает браузер
-chromium для e2e-тестов и подключает hk
+chromium для e2e-тестов и подключает hk
 только для этого репозитория. Переменные окружения для локального запуска не требуются.
 Бекенд принимает `HOST` и `PORT` (по умолчанию `127.0.0.1:3000`). Для согласованного
 запуска через daemons используются порты 3000 и 5173.
@@ -82,7 +82,7 @@ Vite перенаправляет `/api` на бекенд, SDK вызывает
 ```bash
 mise run generate    # TypeSpec → OpenAPI → SDK
 mise run build       # сборка бекенда и фронтенда
-mise run check       # все проверки, тесты и сборка
+mise run check       # все проверки, тесты и сборка
 mise run fix         # исправить форматирование
 mise run security:audit # проверка yarn.lock по базе OSV (нужна сеть)
 ```
@@ -94,9 +94,9 @@ mise run security:audit # проверка yarn.lock по базе OSV (нужн
 
 Vitest запускает один дымовой тест: настоящий HTTP-сервер на свободном порту,
 вызов `GET /` через SDK, статус `200`, остановка сервера после теста.
-Playwright (`yarn test:e2e`) проверяет e2e-сценарии фронтенда на chromium против
-собранного `vite preview`: открытие главной, переход по CTA на заглушку записи,
-возврат на главную.
+Playwright (`mise run test:e2e`) проверяет e2e-сценарии фронтенда на chromium против
+собранного `vite preview`: открытие главной, переход по CTA на заглушку записи,
+возврат на главную.
 Сборка Vite не заменяет проверку типов: TypeScript проверяется отдельно в strict-режиме.
 
 Компиляция и проверка типов выполняются TS 7 (`tsc`). Hey API и dependency-cruiser
@@ -107,7 +107,7 @@ Playwright (`yarn test:e2e`) проверяет e2e-сценарии фронт�
 ## Проверки качества
 
 `mise run check` запускает проверку генерации, Oxlint, oxfmt, TypeScript, Knip,
-dependency-cruiser, syncpack, Betterleaks, jactionlint, Vitest, сборку и Playwright e2e.
+dependency-cruiser, syncpack, Betterleaks, jactionlint, Vitest, сборку и Playwright e2e.
 Перед коммитом hk проверяет форматирование и линт изменённых файлов и секреты
 в staged-изменениях; перед push запускает полный `check`. Автоисправления в хуках отключены.
 GitHub Actions вызывает ту же команду на каждый push и pull request.

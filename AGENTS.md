@@ -4,7 +4,7 @@
 
 - Окружение: `mise trust`, `mise install`, `mise run setup`.
 - Разработка: `mise run dev`; управление серверами: `mise run dev:status`, `mise run dev:logs`, `mise run dev:stop`.
-- Тесты: `yarn test` (Vitest: API-smoke) и `yarn test:e2e` (Playwright: e2e фронтенда, нужен браузер `yarn playwright install chromium`).
+- Тесты: `mise run test` (Vitest: API-smoke) и `mise run test:e2e` (Playwright e2e, со сборкой фронтенда). Браузер ставится `mise run setup`; разово обновить — `yarn playwright install chromium`.
 - Генерация OpenAPI и SDK: `mise run generate`.
 - Сборка: `mise run build`.
 - Все проверки: `mise run check`; форматирование: `mise run fix`.
