@@ -1,0 +1,58 @@
+[settings]
+experimental = true
+
+[tools]
+node = "26.13.1"
+yarn = "4.18.1"
+hk = "2.12.0"
+pitchfork = "2.34.0"
+"github:betterleaks/betterleaks" = "1.10.1"
+"github:jdx/jactionlint" = "2.6.0"
+"github:google/osv-scanner" = "2.7.1"
+gh = "latest"
+
+[env]
+_.path = ["node_modules/.bin"]
+
+[daemons.api]
+run = "exec yarn workspace @calendar/api dev"
+port = 3000
+ready_port = 3000
+
+[daemons.web]
+run = "exec yarn workspace @calendar/web dev"
+port = 5173
+ready_port = 5173
+depends = ["api"]
+
+[tasks.setup]
+description = "Установить зависимости, сгенерировать SDK и подключить git-хуки"
+run = ["yarn install --immutable", "yarn generate", "hk install --mise"]
+
+[tasks.dev]
+description = "Запустить серверы разработки"
+run = "mise daemons start"
+
+[tasks."dev:stop"]
+run = "mise daemons stop"
+
+[tasks."dev:status"]
+run = "mise daemons status"
+
+[tasks."dev:logs"]
+run = "mise daemons logs"
+
+[tasks.generate]
+run = "yarn generate"
+
+[tasks.build]
+run = "yarn build"
+
+[tasks.check]
+run = "yarn check"
+
+[tasks.fix]
+run = "yarn fix"
+
+[tasks."security:audit"]
+run = "osv-scanner scan source --lockfile=yarn.lock"

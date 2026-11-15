@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.yarn/*
+!.yarn/patches/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+.mise.local.toml

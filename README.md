@@ -1,6 +1,5 @@
 # Календарь звонков
 
-
 [![hexlet-check](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/actions)
 
 Разработайте совместно с ИИ сервис для бронирования календаря
@@ -15,7 +14,7 @@
 ### Владелец
 
 1. Владелец задаёт общее расписание: доступные дни недели и время внутри дня. Расписание одно на аккаунт — все типы встреч наследуют его.
-2. Создаёт тип встречи: указывает название, описание и длительность *(например: Консультация — 30 минут)*.
+2. Создаёт тип встречи: указывает название, описание и длительность _(например: Консультация — 30 минут)_.
 3. Копирует ссылку на этот тип встречи и делится ею с другими пользователями.
 
 ### Гость (переходит по ссылке, регистрация не нужна)
@@ -33,20 +32,99 @@
 
 ## Стек
 
-- Разное
+TypeScript 7, Node.js 26 LTS, Fastify, React, Vite и Mantine.
+Контракт TypeSpec компилируется в OpenAPI, Hey API генерирует Fetch SDK.
+Зависимости организованы в Yarn workspaces с общим `yarn.lock`.
+
+```text
+apps/api/             — запускаемый бекенд Fastify
+apps/web/             — запускаемый фронтенд Vite + React + Mantine
+packages/api-client/  — библиотека с клиентским SDK
+contracts/            — исходный TypeSpec и сгенерированный OpenAPI
+```
+
+`apps` содержит приложения с собственным запуском, `packages` — импортируемые
+библиотеки. Фронтенд обращается к серверу через SDK, без импорта серверного кода.
 
 ## Установка
 
-<!-- Опишите установку: клонирование, зависимости, переменные окружения -->
+Установите [mise](https://mise.jdx.dev/getting-started.html) версии 2026.11.8 или новее.
+Все остальные версии закреплены в `mise.toml`; отдельно устанавливать Node или Yarn не нужно.
 
 ```bash
 git clone https://github.com/AndrewVdovichenko/ai-for-developers-project-386.git
 cd ai-for-developers-project-386
+mise trust
+mise install
+mise run setup
 ```
+
+`setup` устанавливает зависимости по lock-файлу, генерирует SDK и подключает hk
+только для этого репозитория. Переменные окружения для локального запуска не требуются.
+Бекенд принимает `HOST` и `PORT` (по умолчанию `127.0.0.1:3000`). Для согласованного
+запуска через daemons используются порты 3000 и 5173.
 
 ## Использование
 
-<!-- Добавьте примеры запуска и запись asciinema — именно это смотрит работодатель -->
+```bash
+mise run dev          # запустить оба сервера в фоне
+mise run dev:status   # состояние процессов
+mise run dev:logs     # журналы
+mise run dev:stop     # остановить серверы
+```
+
+Откройте <http://127.0.0.1:5173> и нажмите «Проверить соединение с сервером».
+Vite перенаправляет `/api` на бекенд, SDK вызывает его корневой маршрут `GET /`.
+Прямой адрес бекенда: <http://127.0.0.1:3000>.
+
+```bash
+mise run generate    # TypeSpec → OpenAPI → SDK
+mise run build       # сборка бекенда и фронтенда
+mise run check       # все проверки, дымовой тест и сборка
+mise run fix         # исправить форматирование
+mise run security:audit # проверка yarn.lock по базе OSV (нужна сеть)
+```
+
+Изменяйте контракт в `contracts/main.tsp`, затем выполняйте `mise run generate`.
+Каталоги `contracts/generated` и `packages/api-client/src/generated` создаются
+генераторами: ручные правки и устаревшие результаты обнаруживает `check`.
+Результаты генерации добавляются в коммит вместе с контрактом.
+
+Vitest запускает один дымовой тест: настоящий HTTP-сервер на свободном порту,
+вызов `GET /` через SDK, статус `200`, остановка сервера после теста.
+Сборка Vite не заменяет проверку типов: TypeScript проверяется отдельно в strict-режиме.
+
+Компиляция и проверка типов выполняются TS 7 (`tsc`). Hey API и dependency-cruiser
+используют программный API TS 6: для них в корне установлен официальный пакет
+`@typescript/typescript6` под именем `typescript`. Пакет `@typescript/native` —
+алиас TypeScript 7, предоставляющий корневую команду `tsc`; это не nightly-preview.
+
+## Проверки качества
+
+`mise run check` запускает проверку генерации, Oxlint, oxfmt, TypeScript, Knip,
+dependency-cruiser, syncpack, Betterleaks, jactionlint, Vitest и сборку.
+Перед коммитом hk проверяет форматирование и линт изменённых файлов и секреты
+в staged-изменениях; перед push запускает полный `check`. Автоисправления в хуках отключены.
+GitHub Actions вызывает ту же команду на каждый push и pull request.
+Проверка уязвимостей OSV запускается отдельно еженедельно и вручную; Dependabot
+предлагает обновления npm-зависимостей и GitHub Actions.
+
+Набор выбран по [dev-quality-gates](https://github.com/mokevnin/dev-quality-gates).
+Результаты проверки инструментов и ограничения описаны в [отчёте](docs/quality-gates.md).
+Генерируемый код проверяется компилятором, но исключён из форматирования и линта.
+Workflow Хекслета сохранён без изменений и исключён из новых стилевых проверок.
+
+Коммиты: Conventional Commits с описанием на русском, например
+`chore: добавить каркас приложения`. В теле — краткое описание изменений.
+
+## Документация, использованная при создании каркаса
+
+- [Fastify Getting Started](https://fastify.dev/docs/latest/Guides/Getting-Started/)
+- [Vite Getting Started](https://vite.dev/guide/) — шаблон `react-ts` через `create-vite`
+- [Mantine с Vite](https://mantine.dev/guides/vite/)
+- [TypeSpec Getting Started](https://typespec.io/docs/)
+- [Hey API](https://heyapi.dev/docs/openapi/typescript/get-started)
+- [Vitest Getting Started](https://vitest.dev/guide/)
 
 ---
 
