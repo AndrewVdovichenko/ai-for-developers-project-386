@@ -4,6 +4,7 @@
 
 - Окружение: `mise trust`, `mise install`, `mise run setup`.
 - Разработка: `mise run dev`; управление серверами: `mise run dev:status`, `mise run dev:logs`, `mise run dev:stop`.
+- Тесты: `yarn test` (Vitest: API-smoke) и `yarn test:e2e` (Playwright: e2e фронтенда, нужен браузер `yarn playwright install chromium`).
 - Генерация OpenAPI и SDK: `mise run generate`.
 - Сборка: `mise run build`.
 - Все проверки: `mise run check`; форматирование: `mise run fix`.
@@ -20,6 +21,7 @@
 - Изменения API начинай с TypeSpec; генерируй OpenAPI и SDK и коммить результаты вместе с контрактом.
 - Компиляция приложения использует TS 7. Корневой `typescript` — совместимый API TS 6 для Hey API и dependency-cruiser; корневой `tsc` предоставляет алиас `@typescript/native`.
 - После изменений кода выполни `mise run check`; если проверка недоступна, укажи причину в результате работы.
+- Типографика русских текстов: не оставляй висячие предлоги, союзы и частицы («в», «на», «у», «с», «по», «о», «об», «и», «а», «но», «или» и т. п.) в конце строки — отделяй их от следующего слова неразрывным пробелом (U+00A0). В JSX — `&nbsp;` или `{'\u00A0'}`, в Markdown и коде — символ U+00A0 целиком.
 
 ## Коммиты
 
