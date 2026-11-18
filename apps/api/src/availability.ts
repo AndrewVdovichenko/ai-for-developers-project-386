@@ -41,7 +41,7 @@ function normalize(input: unknown) {
     return true;
   }
   if (!model(input, '', ['revision', 'timeZone', 'days', 'confirmationToken']))
-    return { fieldErrors, parameters: { invalidModel: input ?? null } };
+    return { fieldErrors, parameters: input ?? null };
   if (!integer(input.revision, 0, 2147483646))
     invalid('revision', 'Ожидается целая версия Расписания');
   let timeZone = input.timeZone;

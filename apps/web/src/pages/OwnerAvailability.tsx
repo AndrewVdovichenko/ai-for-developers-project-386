@@ -53,6 +53,26 @@ export function OwnerAvailability() {
     setDraft(next);
     setMessage('');
   }
+  function updateInterval(
+    dayIndex: number,
+    intervalIndex: number,
+    patch: Partial<Draft['days'][number]['intervals'][number]>,
+  ) {
+    if (!draft) return;
+    change({
+      ...draft,
+      days: draft.days.map((day, index) =>
+        index !== dayIndex
+          ? day
+          : {
+              ...day,
+              intervals: day.intervals.map((interval, position) =>
+                position !== intervalIndex ? interval : { ...interval, ...patch },
+              ),
+            },
+      ),
+    });
+  }
   async function refresh() {
     const result = await readAvailability();
     if (result.response?.status === 401) {
@@ -84,6 +104,7 @@ export function OwnerAvailability() {
       );
       if (response.body.code === 'REVISION_CONFLICT') {
         setConflict(true);
+        setCurrent(undefined);
         await refresh();
       }
     }
@@ -284,21 +305,7 @@ export function OwnerAvailability() {
                       placeholder="09:00"
                       disabled={locked}
                       onChange={(event) =>
-                        change({
-                          ...draft,
-                          days: draft.days.map((item, i) =>
-                            i !== index
-                              ? item
-                              : {
-                                  ...item,
-                                  intervals: item.intervals.map((part, p) =>
-                                    p !== position
-                                      ? part
-                                      : { ...part, start: event.currentTarget.value },
-                                  ),
-                                },
-                          ),
-                        })
+                        updateInterval(index, position, { start: event.currentTarget.value })
                       }
                     />
                     <TextInput
@@ -307,21 +314,7 @@ export function OwnerAvailability() {
                       placeholder="18:00"
                       disabled={locked}
                       onChange={(event) =>
-                        change({
-                          ...draft,
-                          days: draft.days.map((item, i) =>
-                            i !== index
-                              ? item
-                              : {
-                                  ...item,
-                                  intervals: item.intervals.map((part, p) =>
-                                    p !== position
-                                      ? part
-                                      : { ...part, end: event.currentTarget.value },
-                                  ),
-                                },
-                          ),
-                        })
+                        updateInterval(index, position, { end: event.currentTarget.value })
                       }
                     />
                     <Button
@@ -385,6 +378,18 @@ export function OwnerAvailability() {
               </Stack>
             </Paper>
           ))}
+          {conflict && !current && (
+            <Button
+              disabled={pending}
+              onClick={() =>
+                void run(async () => {
+                  await refresh();
+                })
+              }
+            >
+              Повторить загрузку актуального Расписания
+            </Button>
+          )}
           {conflict && current && (
             <Paper withBorder p="md">
               <Stack>

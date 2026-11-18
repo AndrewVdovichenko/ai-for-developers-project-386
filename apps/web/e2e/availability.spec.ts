@@ -179,7 +179,9 @@ for (const fallback of ['session', 'cookie', 'none'] as const) {
       await page.reload();
       await expect(page.getByRole('alert')).toContainText(/Исход.*неизвестен/);
       const cookies = await page.context().cookies();
-      const technical = cookies.find((cookie) => cookie.name === 'owner_availability_operation');
+      const technical = cookies.find((cookie) =>
+        cookie.name.startsWith('owner_availability_operation_'),
+      );
       if (fallback === 'cookie') {
         expect(decodeURIComponent(technical!.value)).not.toContain('03:00');
         await page.getByLabel('Понедельник: начало 1', { exact: true }).fill('02:00');
@@ -205,7 +207,7 @@ for (const fallback of ['session', 'cookie', 'none'] as const) {
   });
 }
 
-test('потерянный ответ конфликта после перезагрузки оставляет редактор и исходный черновик', async ({
+test('потерянный ответ конфликта после перезагрузки оставляет редактор и исходный черновик', async ({
   page,
   context,
 }) => {
@@ -231,4 +233,62 @@ test('потерянный ответ конфликта после переза
   await expect(
     page.getByRole('button', { name: 'Оставить черновик поверх актуальной версии' }),
   ).toBeVisible();
+});
+
+test('сбой чтения после конфликта позволяет загрузить актуальную неделю, сохраняя черновик', async ({
+  page,
+  context,
+}) => {
+  await login(page);
+  await page.getByLabel('Понедельник: начало 1', { exact: true }).fill('02:00');
+  const other = await context.newPage();
+  await other.goto('/owner/availability');
+  await expect(other.getByLabel('Понедельник: начало 1', { exact: true })).toBeVisible();
+  await other.getByLabel('Понедельник: начало 1', { exact: true }).fill('01:00');
+  await other.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+  await expect(other.getByRole('status')).toBeVisible();
+  await other.close();
+  await page.route('**/api/owner/availability', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' })
+      : route.continue(),
+  );
+  await page.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText(/Не удалось загрузить/);
+  await page.unroute('**/api/owner/availability');
+  await page
+    .getByRole('button', { name: 'Повторить загрузку актуального Расписания', exact: true })
+    .click();
+  await expect(page.getByText('Понедельник: 01:00–24:00', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Понедельник: начало 1', { exact: true })).toHaveValue('02:00');
+});
+
+test('вторая вкладка не стирает восстановление потерянного ответа первой', async ({
+  page,
+  context,
+}) => {
+  await login(page);
+  const other = await context.newPage();
+  await other.goto('/owner/availability');
+  await expect(other.getByLabel('Понедельник: начало 1', { exact: true })).toBeVisible();
+  await page.getByLabel('Понедельник: начало 1', { exact: true }).fill('02:00');
+  let operationKey: string | undefined;
+  await page.route('**/api/owner/availability', async (route) => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    operationKey = route.request().headers()['idempotency-key'];
+    await route.fetch();
+    await route.abort();
+  });
+  await page.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText(/Исход.*неизвестен/);
+  await other.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+  await expect(other.getByRole('alert')).toContainText(/другой вкладке/);
+  await page.unroute('**/api/owner/availability');
+  const recovered = page.waitForRequest((request) =>
+    request.url().endsWith(`/api/owner/operations/${operationKey}`),
+  );
+  await page.reload();
+  await recovered;
+  await expect(page.getByRole('status')).toContainText('Расписание сохранено');
+  await other.close();
 });

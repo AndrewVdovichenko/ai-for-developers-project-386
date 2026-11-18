@@ -3,6 +3,14 @@ export function operationStorage<Context extends { key: string; fingerprint: str
   cookieName: string,
   technicalContext: (context: Context) => object = ({ key, fingerprint }) => ({ key, fingerprint }),
 ) {
+  // window.name carries only a random tab identifier across reloads, never a key or form.
+  // The actual context still follows localStorage → sessionStorage → technical cookie.
+  const prefix = 'calendar-tab:';
+  if (!/^calendar-tab:[0-9a-f-]{36}$/.test(window.name))
+    window.name = `${prefix}${crypto.randomUUID()}`;
+  const tabId = window.name.slice(prefix.length);
+  storageName = `${storageName}:${tabId}`;
+  cookieName = `${cookieName}_${tabId}`;
   function stores() {
     return [() => window.localStorage, () => window.sessionStorage];
   }

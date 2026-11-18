@@ -251,3 +251,20 @@ test('ожидание общей блокировки ограничено и 
     await f.close();
   }
 });
+
+test('разные некорректные JSON-модели под прежним ключом не совпадают', async () => {
+  const f = await fixture();
+  try {
+    const key = randomUUID();
+    const send = (body: unknown) =>
+      put({
+        ...f,
+        headers: { ...f.headers, 'Idempotency-Key': key },
+        body: body as SaveAvailability,
+      });
+    expect((await send(null)).error?.code).toBe('VALIDATION_FAILED');
+    expect((await send({ invalidModel: null })).error?.code).toBe('IDEMPOTENCY_KEY_REUSED');
+  } finally {
+    await f.close();
+  }
+});
