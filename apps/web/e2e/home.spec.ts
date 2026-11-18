@@ -12,16 +12,15 @@ test('главная страница открывается', async ({ page }) 
   await expect(page.getByRole('link', { name: /Записаться на\s+встречу/ })).toBeVisible();
 });
 
-test('CTA ведёт на страницу записи', async ({ page }) => {
+test('CTA ведёт в каталог', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: /Записаться на\s+встречу/ }).click();
-  await expect(page).toHaveURL(/\/booking$/);
-  await expect(page.getByRole('heading', { level: 1, name: /Страница записи/ })).toBeVisible();
-  await expect(page.getByText(/Здесь появится календарь/)).toBeVisible();
+  await expect(page).toHaveURL(/\/event-types$/);
+  await expect(page.getByRole('heading', { level: 1, name: /Типы встречи/ })).toBeVisible();
 });
 
-test('со страницы записи можно вернуться на главную', async ({ page }) => {
-  await page.goto('/booking');
+test('из каталога можно вернуться на главную', async ({ page }) => {
+  await page.goto('/event-types');
   await page.getByRole('link', { name: /На\s+главную/ }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('link', { name: /Записаться на\s+встречу/ })).toBeVisible();
