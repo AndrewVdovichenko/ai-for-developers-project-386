@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import pg from 'pg';
 import { createEventType, getEventType, listEventTypes } from './event-types.js';
 import { ownerSubject, readOperation } from './operations.js';
+import { getAvailability, saveAvailability } from './availability.js';
 import { checkSchema } from './migrations.js';
 import { AccessError, login, logout, session } from './access.js';
 
@@ -114,6 +115,15 @@ export function createApp(options: {
     return reply.header('Set-Cookie', cookie('', 0)).code(204).send();
   });
   app.get('/api/event-types', () => listEventTypes(options.pool));
+  app.get('/api/owner/availability', () => getAvailability(options.pool));
+  app.put('/api/owner/availability', async (request, reply) => {
+    const result = await saveAvailability(
+      options.pool,
+      request.headers['idempotency-key'],
+      request.body,
+    );
+    return reply.code(result.status).send(result.body);
+  });
   app.get<{ Params: { id: string } }>('/api/event-types/:id', async (request, reply) => {
     const result = await getEventType(options.pool, request.params.id);
     return (

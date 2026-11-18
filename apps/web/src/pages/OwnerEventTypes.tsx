@@ -59,7 +59,7 @@ export function OwnerEventTypes() {
       setFieldErrors({});
       setError('');
       void refresh();
-    } else {
+    } else if ('code' in response.body) {
       const body: ApiError = response.body;
       setError(body.message);
       setFieldErrors(

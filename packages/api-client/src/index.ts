@@ -4,6 +4,8 @@ export {
   eventTypesListEventTypes,
   eventTypesGetEventType,
   getOwnerOperation,
+  ownerAvailabilityGetAvailability,
+  ownerAvailabilitySaveAvailability,
   ownerSessionGetOwnerSession,
   ownerSessionLoginOwner,
   ownerSessionLogoutOwner,
@@ -13,4 +15,9 @@ export type {
   CreateEventType,
   ApiError,
   OperationResponse,
+  AvailabilitySettings,
+  AvailabilityResponse,
+  SaveAvailability,
+  WeeklyDay,
+  WorkingInterval,
 } from './generated/types.gen.js';

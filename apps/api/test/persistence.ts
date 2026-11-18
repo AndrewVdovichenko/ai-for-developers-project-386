@@ -13,6 +13,8 @@ import {
   createEventType,
   eventTypesListEventTypes,
   getOwnerOperation,
+  ownerAvailabilityGetAvailability,
+  ownerAvailabilitySaveAvailability,
 } from '@calendar/api-client';
 import { createPool } from '../src/database.js';
 import { migrate } from '../src/migrations.js';
@@ -142,8 +144,39 @@ try {
     body: { name: '', durationMinutes: 30 },
   });
   assert.equal(refused.response!.status, 400);
+  const scheduleKey = randomUUID();
+  const scheduleBody = {
+    revision: 0,
+    timeZone: 'Europe/Berlin',
+    days: Array.from({ length: 7 }, (_, index) => ({
+      weekday: index + 1,
+      intervals: index === 0 ? [{ startMinute: 540, endMinute: 1440 }] : [],
+    })),
+  };
+  const scheduleHeaders = { ...typeHeaders, 'Idempotency-Key': scheduleKey };
+  const schedule = await ownerAvailabilitySaveAvailability({
+    baseUrl,
+    headers: scheduleHeaders,
+    body: scheduleBody,
+  });
+  assert.equal(schedule.response!.status, 200);
   for (let i = 0; i < 5; i++) assert.equal((await login('неверный')).response!.status, 401);
   baseUrl = await recreate();
+  assert.deepEqual(
+    (await ownerAvailabilityGetAvailability({ baseUrl, headers: scheduleHeaders })).data!
+      .availability,
+    schedule.data!.availability,
+  );
+  assert.deepEqual(
+    (
+      await ownerAvailabilitySaveAvailability({
+        baseUrl,
+        headers: scheduleHeaders,
+        body: scheduleBody,
+      })
+    ).data,
+    schedule.data,
+  );
   const status = (Cookie: string) => ownerSessionGetOwnerSession({ baseUrl, headers: { Cookie } });
   assert.equal((await status(activeCookie)).data?.expiresAt, active.data!.expiresAt);
   assert.equal((await status(revokedCookie)).data?.authenticated, false);
@@ -194,6 +227,16 @@ try {
     created.data,
   );
   assert.equal((await eventTypesListEventTypes({ baseUrl })).data!.items.length, 1);
+  assert.deepEqual(
+    (
+      await ownerAvailabilitySaveAvailability({
+        baseUrl,
+        headers: { ...scheduleHeaders, Cookie: replacementCookie },
+        body: scheduleBody,
+      })
+    ).data,
+    schedule.data,
+  );
   console.log(
     'Пересоздание контейнера с тем же томом сохраняет пароль, сроки, отзыв, лимит входа, типы встреч и результаты операций.',
   );
