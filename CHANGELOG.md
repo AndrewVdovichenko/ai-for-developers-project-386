@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.3.0...v0.4.0) (2026-11-18)
+
+
+### Новые возможности
+
+* добавить недельное Расписание Владельца ([#17](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/17)) ([6772b9b](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/6772b9bee2e64b251f93a82ccfd3256120c6e6dc))
+* добавить недельное Расписание Владельца ([#17](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/17)) ([d145215](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/d145215a0fd35b7d504a231064ecdbc21cbedfc9))
+
+
+### Исправления
+
+* закрыть пограничные случаи восстановления Расписания ([#17](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/17)) ([b067110](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/b067110f5617b3cf6db9d02021fd1ee7cf3685a4))
+
 ## [0.3.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.2.0...v0.3.0) (2026-11-18)
 
 
