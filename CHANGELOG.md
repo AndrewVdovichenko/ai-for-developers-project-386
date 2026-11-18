@@ -5,7 +5,6 @@
 
 ### Новые возможности
 
-* добавить вход Владельца и постоянное хранение доступа ([5da1b16](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/5da1b1679b662911b09ba0d4b5e2bc456e5bcd3a))
 * добавить вход Владельца и постоянное хранение доступа ([#15](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/15)) ([aa43fa0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/aa43fa03bca4f954d6a3a77ef6b944e0df85aeb1))
 
 ## 0.1.0 (2026-11-18)
