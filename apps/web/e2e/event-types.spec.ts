@@ -15,6 +15,25 @@ async function fill(page: Page, name: string) {
   await page.getByLabel('Длительность, минут').fill('45');
 }
 
+test('каталог различает загрузку, ошибку, пустоту; неизвестный тип ведёт в каталог', async ({
+  page,
+}) => {
+  await page.route('**/api/event-types', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
+  );
+  await page.goto('/event-types');
+  await expect(page.getByRole('alert')).toContainText(/Не удалось загрузить/);
+  await page.unroute('**/api/event-types');
+  await page.getByRole('button', { name: 'Повторить', exact: true }).click();
+  await expect(page.getByText(/Пока нет типов встреч/)).toBeVisible();
+  for (const id of ['bad-id', randomUUID()]) {
+    await page.goto(`/booking/${id}`);
+    await expect(page.getByRole('alert')).toContainText('Тип встречи не найден');
+    await page.getByRole('link', { name: /В\s+каталог/ }).click();
+    await expect(page).toHaveURL('/event-types');
+  }
+});
+
 test('создание, ошибки полей, копирование, прямая ссылка и каталог', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await login(page);
@@ -173,22 +192,3 @@ for (const fallback of ['session', 'cookie', 'none'] as const) {
     }
   });
 }
-
-test('каталог различает загрузку, ошибку, пустоту; неизвестный тип ведёт в каталог', async ({
-  page,
-}) => {
-  await page.route('**/api/event-types', (route) =>
-    route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
-  );
-  await page.goto('/event-types');
-  await expect(page.getByRole('alert')).toContainText(/Не удалось загрузить/);
-  await page.route('**/api/event-types', (route) => route.fulfill({ json: { items: [] } }));
-  await page.getByRole('button', { name: 'Повторить', exact: true }).click();
-  await expect(page.getByText(/Пока нет типов встреч/)).toBeVisible();
-  for (const id of ['bad-id', randomUUID()]) {
-    await page.goto(`/booking/${id}`);
-    await expect(page.getByRole('alert')).toContainText('Тип встречи не найден');
-    await page.getByRole('link', { name: /В\s+каталог/ }).click();
-    await expect(page).toHaveURL('/event-types');
-  }
-});

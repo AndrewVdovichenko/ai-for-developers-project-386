@@ -26,25 +26,40 @@ export async function readOperation(pool: pg.Pool, subject: string, key: string)
     : { state: 'unknown' as const };
 }
 
+function canonicalJson(value: unknown) {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item).sort(([left], [right]) =>
+            left < right ? -1 : left > right ? 1 : 0,
+          ),
+        )
+      : item,
+  );
+}
+
 // Every action uses the same subject/key namespace and the calendar lock.
-// JSONB equality ignores object property order, including in invalid requests.
+// Canonical JSON ignores object property order, including in invalid requests.
 export async function runOperation(
   pool: pg.Pool,
   operation: { subject: string; key: unknown; action: string; parameters: unknown },
   execute: (client: pg.PoolClient) => Promise<OperationResponse>,
 ) {
   const key = operationKey(operation.key);
+  const parameters = canonicalJson(operation.parameters);
   return transaction(pool, async (client) => {
     const calendar = await client.query('SELECT id FROM calendar WHERE id = 1 FOR UPDATE');
     if (calendar.rowCount !== 1) throw new Error('Календарь не создан');
-    const previous = await client.query<OperationResponse & { matches: boolean }>(
-      `SELECT status, body, action = $3 AND parameters = $4::jsonb AS matches
+    const previous = await client.query<
+      OperationResponse & { action: string; parameters: unknown }
+    >(
+      `SELECT status, body, action, parameters
        FROM operations WHERE subject = $1 AND key = $2`,
-      [operation.subject, key, operation.action, JSON.stringify(operation.parameters)],
+      [operation.subject, key],
     );
     const row = previous.rows[0];
     if (row) {
-      if (!row.matches)
+      if (row.action !== operation.action || canonicalJson(row.parameters) !== parameters)
         return {
           status: 409,
           body: {
@@ -61,7 +76,7 @@ export async function runOperation(
         operation.subject,
         key,
         operation.action,
-        JSON.stringify(operation.parameters),
+        parameters,
         result.status,
         JSON.stringify(result.body),
       ],

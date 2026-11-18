@@ -78,6 +78,20 @@ export function OwnerEventTypes() {
       finish({ status: result.response.status, body: result.error });
     else setError('Исход пока неизвестен. Проверьте результат или повторите с тем же ключом.');
   }
+  function applyRecovery(result: Awaited<ReturnType<typeof readCreation>>) {
+    if (result.response?.status === 401) requireLogin();
+    else if (result.data?.state === 'completed') finish(result.data.response);
+    else if (result.data?.state === 'unknown') return 'unknown';
+    else setError('Не удалось проверить результат. Повторите попытку.');
+    return 'handled';
+  }
+  function showUnknown(operation: CreationContext) {
+    setError(
+      operation.parameters
+        ? 'Исход пока неизвестен. Можно безопасно повторить операцию.'
+        : 'Исход пока неизвестен. Введите исходные поля для повтора прежней операции.',
+    );
+  }
   async function recover(operation: CreationContext, repeat: boolean) {
     if (busy.current) return;
     busy.current = true;
@@ -85,20 +99,10 @@ export function OwnerEventTypes() {
     setError('');
     try {
       const result = await readCreation(operation.key);
-      if (result.response?.status === 401) {
-        requireLogin();
-        return;
-      }
-      if (result.data?.state === 'completed') finish(result.data.response);
-      else if (result.data?.state === 'unknown') {
+      if (applyRecovery(result) === 'unknown') {
         if (repeat && operation.parameters) await post(operation, operation.parameters);
-        else
-          setError(
-            operation.parameters
-              ? 'Исход пока неизвестен. Можно безопасно повторить операцию.'
-              : 'Исход пока неизвестен. Введите исходные поля для повтора прежней операции.',
-          );
-      } else setError('Не удалось проверить результат. Повторите попытку.');
+        else showUnknown(operation);
+      }
     } catch {
       setError('Нет соединения. Исход операции пока неизвестен.');
     } finally {
@@ -114,16 +118,9 @@ export function OwnerEventTypes() {
       if (catalog.status === 'fulfilled' && catalog.value.data) setItems(catalog.value.data.items);
       else setListError(true);
       if (!context) return;
-      if (recovery.status === 'fulfilled' && recovery.value?.response?.status === 401)
-        requireLogin();
-      else if (recovery.status === 'fulfilled' && recovery.value?.data?.state === 'completed')
-        finish(recovery.value.data.response);
-      else
-        setError(
-          context.parameters
-            ? 'Исход пока неизвестен. Можно безопасно повторить операцию.'
-            : 'Исход пока неизвестен. Введите исходные поля для повтора прежней операции.',
-        );
+      if (recovery.status === 'fulfilled' && recovery.value) {
+        if (applyRecovery(recovery.value) === 'unknown') showUnknown(context);
+      } else setError('Нет соединения. Исход операции пока неизвестен.');
       busy.current = false;
       setPending(false);
     },
@@ -182,18 +179,7 @@ export function OwnerEventTypes() {
       setContext(operation);
       if (context) {
         const result = await readCreation(operation.key);
-        if (result.response?.status === 401) {
-          requireLogin();
-          return;
-        }
-        if (result.data?.state === 'completed') {
-          finish(result.data.response);
-          return;
-        }
-        if (result.data?.state !== 'unknown') {
-          setError('Не удалось проверить результат');
-          return;
-        }
+        if (applyRecovery(result) !== 'unknown') return;
       }
       await post(operation, parameters);
     } catch {

@@ -9,6 +9,7 @@ export function BookingPage() {
   const { id = '' } = useParams();
   return <BookingDetails key={id} id={id} />;
 }
+
 function BookingDetails({ id }: { id: string }) {
   const [type, setType] = useState<EventType>();
   const [error, setError] = useState('');

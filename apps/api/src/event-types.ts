@@ -52,7 +52,12 @@ export function createEventType(pool: pg.Pool, key: unknown, input: unknown) {
         };
       const result = await client.query(
         `INSERT INTO event_types (id, name, description, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING ${columns}`,
-        [randomUUID(), fields.name, fields.description, fields.durationMinutes],
+        [
+          randomUUID(),
+          JSON.stringify(fields.name),
+          JSON.stringify(fields.description),
+          fields.durationMinutes,
+        ],
       );
       return { status: 201, body: { eventType: result.rows[0] } };
     },
