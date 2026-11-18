@@ -89,3 +89,48 @@ test('SQL, блокировки, вся транзакция и пул имею
     await db.close();
   }
 }, 25_000);
+
+test('переход на text откатывается без потери старых строк с U+0000', async () => {
+  const db = await testDatabase();
+  const dir = await mkdtemp(join(tmpdir(), 'calendar-text-migration-'));
+  try {
+    for (const name of [
+      '001-access.sql',
+      '002-event-types.sql',
+      '003-operation-json.sql',
+      '004-event-type-unicode.sql',
+    ])
+      await writeFile(
+        join(dir, name),
+        await readFile(new URL(`../migrations/${name}`, import.meta.url)),
+      );
+    await migrate(db.pool, pathToFileURL(`${dir}/`));
+    await db.pool.query(
+      'INSERT INTO event_types (id, name, description, duration_minutes) VALUES ($1, $2, $3, $4)',
+      [
+        '11111111-1111-4111-8111-111111111111',
+        JSON.stringify('Тип\u0000😀'),
+        JSON.stringify('Описание\n'),
+        30,
+      ],
+    );
+    await expect(db.migrate()).rejects.toThrow(/Unicode/);
+    expect(
+      (
+        await db.pool.query(
+          'SELECT name, description, pg_typeof(name)::text AS storage FROM event_types',
+        )
+      ).rows,
+    ).toEqual([{ name: 'Тип\u0000😀', description: 'Описание\n', storage: 'json' }]);
+    expect(
+      (
+        await db.pool.query(
+          "SELECT version FROM schema_migrations WHERE version = '005-event-type-text.sql'",
+        )
+      ).rowCount,
+    ).toBe(0);
+  } finally {
+    await db.close();
+    await rm(dir, { recursive: true });
+  }
+});
