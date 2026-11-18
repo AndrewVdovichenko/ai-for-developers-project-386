@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
+    "@calendar/api-client": "workspace:*",
     "@mantine/core": "9.8.0",
     "@mantine/hooks": "9.8.0",
     "react": "19.3.1",

@@ -50,12 +50,32 @@ run = "mise daemons logs"
 [tasks.generate]
 run = "yarn generate"
 
+[tasks."db:start"]
+description = "Запустить локальную PostgreSQL в Apple Container с постоянным томом"
+run = "node scripts/database.mjs start"
+
+[tasks."db:stop"]
+run = "node scripts/database.mjs stop"
+
+[tasks."db:status"]
+run = "node scripts/database.mjs status"
+
+[tasks."db:migrate"]
+run = "yarn workspace @calendar/api migrate"
+
+[tasks."owner:password"]
+run = "yarn workspace @calendar/api owner:setup"
+
 [tasks.build]
 run = "yarn build"
 
 [tasks.test]
-description = "Запустить Vitest: API-smoke"
+description = "Запустить Vitest: HTTP API и PostgreSQL"
 run = "yarn test"
+
+[tasks."test:persistence"]
+description = "Проверить пересоздание PostgreSQL с тем же томом в Apple Container"
+run = "yarn workspace @calendar/api test:persistence"
 
 [tasks."test:e2e"]
 description = "Собрать фронтенд и прогнать Playwright e2e"

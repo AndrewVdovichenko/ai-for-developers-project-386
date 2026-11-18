@@ -22,7 +22,163 @@ paths:
                       - ok
                 required:
                   - status
-components: {}
+  /api/owner/session:
+    get:
+      operationId: OwnerSession_getOwnerSession
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionStatus'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: OwnerSession_loginOwner
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          description: Client error
+          headers:
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                format: int32
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+    delete:
+      operationId: OwnerSession_logoutOwner
+      parameters: []
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+components:
+  schemas:
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_REQUEST
+            - OWNER_AUTH_REQUIRED
+            - INVALID_PASSWORD
+            - ORIGIN_NOT_ALLOWED
+            - OWNER_NOT_CONFIGURED
+            - LOGIN_RATE_LIMITED
+            - TEMPORARILY_UNAVAILABLE
+            - INTERNAL_ERROR
+        message:
+          type: string
+        retryAfterSeconds:
+          type: integer
+          format: int32
+    Session:
+      type: object
+      required:
+        - authenticated
+        - expiresAt
+        - serverNow
+      properties:
+        authenticated:
+          type: boolean
+        expiresAt:
+          type: string
+          nullable: true
+        serverNow:
+          type: string
+    SessionStatus:
+      type: object
+      required:
+        - configured
+      properties:
+        configured:
+          type: boolean
+      allOf:
+        - $ref: '#/components/schemas/Session'
 servers:
   - url: http://127.0.0.1:3000
     description: Локальная разработка
