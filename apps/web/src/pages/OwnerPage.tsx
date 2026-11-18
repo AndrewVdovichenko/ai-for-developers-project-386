@@ -1,6 +1,7 @@
 import { Alert, Button, Container, Group, Loader, Stack, Title, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { OwnerEventTypes } from './OwnerEventTypes';
 import { readSession, signOut } from '../owner-api';
 
 const sections = [
@@ -71,10 +72,10 @@ export function OwnerPage() {
                 </Text>
               ))}
             </Group>
-            <Text>
-              Вы&nbsp;вошли в&nbsp;раздел Владельца. Управление календарём появится
-              на&nbsp;следующих этапах.
-            </Text>
+            {location.pathname === '/owner/event-types' && <OwnerEventTypes />}
+            {location.pathname !== '/owner/event-types' && (
+              <Text>Управление этим разделом появится на&nbsp;следующих этапах.</Text>
+            )}
             <Button
               loading={pending}
               onClick={() => {

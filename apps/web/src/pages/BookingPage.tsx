@@ -1,25 +1,73 @@
-import { Alert, AppShell, Button, Container, Stack, Title } from '@mantine/core';
-import { Link } from 'react-router';
-import { ShellHeader } from '../ShellHeader';
+import { Alert, Button, Container, Loader, Stack, Title } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router';
+import type { EventType } from '@calendar/api-client';
+import { readType } from '../event-types-api';
+import { EventTypeCard } from '../EventTypeCard';
 
 export function BookingPage() {
+  const { id = '' } = useParams();
+  return <BookingDetails key={id} id={id} />;
+}
+function BookingDetails({ id }: { id: string }) {
+  const [type, setType] = useState<EventType>();
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    void readType(id)
+      .then((result) => {
+        if (!active) return;
+        if (result.data) setType(result.data);
+        else
+          setError(
+            result.response?.status === 404
+              ? 'Тип встречи не найден'
+              : 'Не удалось загрузить тип встречи',
+          );
+      })
+      .catch(() => {
+        if (active) setError('Не удалось загрузить тип встречи');
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, attempt]);
   return (
-    <AppShell header={{ height: 60 }} padding={0}>
-      <ShellHeader />
-      <AppShell.Main>
-        <Container size="sm" py="xl">
-          <Stack gap="md">
-            <Title order={1}>Страница записи</Title>
+    <Container size="sm" py="xl">
+      <Stack>
+        <Title order={1}>Страница записи</Title>
+        {error ? (
+          <Alert color="red" role="alert">
+            {error}
+          </Alert>
+        ) : type ? (
+          <>
+            <EventTypeCard type={type} />
             <Alert color="teal" title="Здесь появится календарь">
-              Выбор дня, свободные слоты и&nbsp;подтверждение записи приходят на&nbsp;следующем
-              этапе&nbsp;— вместе с&nbsp;бронированием в&nbsp;API.
+              Выбор дня и&nbsp;слота появится на&nbsp;следующем этапе.
             </Alert>
-            <Button component={Link} to="/" variant="subtle" w="fit-content">
-              На&nbsp;главную
-            </Button>
-          </Stack>
-        </Container>
-      </AppShell.Main>
-    </AppShell>
+          </>
+        ) : (
+          <Loader aria-label="Загружаем тип встречи" />
+        )}
+        {error && error !== 'Тип встречи не найден' && (
+          <Button
+            onClick={() => {
+              setError('');
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Повторить
+          </Button>
+        )}
+        <Button component={Link} to="/event-types" variant="subtle">
+          В&nbsp;каталог
+        </Button>
+        <Button component={Link} to="/" variant="subtle">
+          На&nbsp;главную
+        </Button>
+      </Stack>
+    </Container>
   );
 }

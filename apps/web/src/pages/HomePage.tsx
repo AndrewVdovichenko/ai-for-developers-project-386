@@ -15,7 +15,7 @@ export function HomePage() {
               и&nbsp;email и&nbsp;получает запись в&nbsp;календаре владельца. Регистрация гостю
               не&nbsp;нужна.
             </Text>
-            <Button component={Link} to="/booking" size="lg" w="fit-content">
+            <Button component={Link} to="/event-types" size="lg" w="fit-content">
               Записаться на&nbsp;встречу
             </Button>
           </Stack>

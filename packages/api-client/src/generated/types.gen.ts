@@ -5,9 +5,43 @@ export type ClientOptions = {
 };
 
 export type ApiError = {
-    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR';
+    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND';
     message: string;
+    fieldErrors?: Array<{
+        field: string;
+        code: string;
+        message: string;
+    }>;
     retryAfterSeconds?: number;
+};
+
+export type CreateEventType = {
+    name: string;
+    description?: string;
+    durationMinutes: number;
+};
+
+export type EventType = {
+    id: string;
+    name: string;
+    description: string;
+    durationMinutes: number;
+};
+
+export type EventTypeCreated = {
+    eventType: EventType;
+};
+
+export type OperationResponse = {
+    status: number;
+    body: EventTypeCreated | ApiError;
+};
+
+export type OperationResult = {
+    state: 'unknown';
+} | {
+    state: 'completed';
+    response: OperationResponse;
 };
 
 export type Session = {
@@ -37,6 +71,159 @@ export type GetStatusResponses = {
 };
 
 export type GetStatusResponse = GetStatusResponses[keyof GetStatusResponses];
+
+export type EventTypesListEventTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/event-types';
+};
+
+export type EventTypesListEventTypesErrors = {
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type EventTypesListEventTypesError = EventTypesListEventTypesErrors[keyof EventTypesListEventTypesErrors];
+
+export type EventTypesListEventTypesResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: {
+        items: Array<EventType>;
+    };
+};
+
+export type EventTypesListEventTypesResponse = EventTypesListEventTypesResponses[keyof EventTypesListEventTypesResponses];
+
+export type EventTypesGetEventTypeData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/event-types/{id}';
+};
+
+export type EventTypesGetEventTypeErrors = {
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type EventTypesGetEventTypeError = EventTypesGetEventTypeErrors[keyof EventTypesGetEventTypeErrors];
+
+export type EventTypesGetEventTypeResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: EventType;
+};
+
+export type EventTypesGetEventTypeResponse = EventTypesGetEventTypeResponses[keyof EventTypesGetEventTypeResponses];
+
+export type CreateEventTypeData = {
+    body: CreateEventType;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/owner/event-types';
+};
+
+export type CreateEventTypeErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type CreateEventTypeError = CreateEventTypeErrors[keyof CreateEventTypeErrors];
+
+export type CreateEventTypeResponses = {
+    /**
+     * The request has succeeded and a new resource has been created as a result.
+     */
+    201: EventTypeCreated;
+};
+
+export type CreateEventTypeResponse = CreateEventTypeResponses[keyof CreateEventTypeResponses];
+
+export type GetOwnerOperationData = {
+    body?: never;
+    path: {
+        key: string;
+    };
+    query?: never;
+    url: '/api/owner/operations/{key}';
+};
+
+export type GetOwnerOperationErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetOwnerOperationError = GetOwnerOperationErrors[keyof GetOwnerOperationErrors];
+
+export type GetOwnerOperationResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: OperationResult;
+};
+
+export type GetOwnerOperationResponse = GetOwnerOperationResponses[keyof GetOwnerOperationResponses];
 
 export type OwnerSessionLogoutOwnerData = {
     body?: never;

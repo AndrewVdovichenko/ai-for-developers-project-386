@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import pg from 'pg';
+import { createEventType, getEventType, listEventTypes } from './event-types.js';
+import { ownerSubject, readOperation } from './operations.js';
 import { checkSchema } from './migrations.js';
 import { AccessError, login, logout, session } from './access.js';
 
@@ -111,5 +113,24 @@ export function createApp(options: {
     await logout(options.pool, secretFrom(request.headers.cookie));
     return reply.header('Set-Cookie', cookie('', 0)).code(204).send();
   });
+  app.get('/api/event-types', () => listEventTypes(options.pool));
+  app.get<{ Params: { id: string } }>('/api/event-types/:id', async (request, reply) => {
+    const result = await getEventType(options.pool, request.params.id);
+    return (
+      result ??
+      reply.code(404).send({ code: 'EVENT_TYPE_NOT_FOUND', message: 'Тип встречи не найден' })
+    );
+  });
+  app.post('/api/owner/event-types', async (request, reply) => {
+    const result = await createEventType(
+      options.pool,
+      request.headers['idempotency-key'],
+      request.body,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.get<{ Params: { key: string } }>('/api/owner/operations/:key', (request) =>
+    readOperation(options.pool, ownerSubject, request.params.key),
+  );
   return app;
 }

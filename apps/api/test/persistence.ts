@@ -10,6 +10,9 @@ import {
   ownerSessionLoginOwner,
   ownerSessionLogoutOwner,
   getStatus,
+  createEventType,
+  eventTypesListEventTypes,
+  getOwnerOperation,
 } from '@calendar/api-client';
 import { createPool } from '../src/database.js';
 import { migrate } from '../src/migrations.js';
@@ -127,11 +130,34 @@ try {
   const activeCookie = cookie(active.response);
   const revokedCookie = cookie((await login(password)).response);
   await ownerSessionLogoutOwner({ baseUrl, headers: { Origin: origin, Cookie: revokedCookie } });
+  const typeKey = randomUUID();
+  const refusalKey = randomUUID();
+  const typeBody = { name: 'Сохранённый тип', durationMinutes: 30 };
+  const typeHeaders = { Origin: origin, Cookie: activeCookie, 'Idempotency-Key': typeKey };
+  const created = await createEventType({ baseUrl, headers: typeHeaders, body: typeBody });
+  assert.equal(created.response!.status, 201);
+  const refused = await createEventType({
+    baseUrl,
+    headers: { ...typeHeaders, 'Idempotency-Key': refusalKey },
+    body: { name: '', durationMinutes: 30 },
+  });
+  assert.equal(refused.response!.status, 400);
   for (let i = 0; i < 5; i++) assert.equal((await login('неверный')).response!.status, 401);
   baseUrl = await recreate();
   const status = (Cookie: string) => ownerSessionGetOwnerSession({ baseUrl, headers: { Cookie } });
   assert.equal((await status(activeCookie)).data?.expiresAt, active.data!.expiresAt);
   assert.equal((await status(revokedCookie)).data?.authenticated, false);
+  assert.deepEqual((await eventTypesListEventTypes({ baseUrl })).data, {
+    items: [created.data!.eventType],
+  });
+  assert.deepEqual(
+    (await createEventType({ baseUrl, headers: typeHeaders, body: typeBody })).data,
+    created.data,
+  );
+  assert.deepEqual(
+    (await getOwnerOperation({ baseUrl, headers: typeHeaders, path: { key: refusalKey } })).data,
+    { state: 'completed', response: { status: 400, body: refused.error } },
+  );
   const limited = await login(password);
   assert.equal(limited.error?.code, 'LOGIN_RATE_LIMITED');
   assert(limited.error.retryAfterSeconds! > 0 && limited.error.retryAfterSeconds! <= 900);
@@ -147,8 +173,29 @@ try {
     replacementSession.data!.expiresAt,
   );
   assert.equal((await login(password)).error?.code, 'INVALID_PASSWORD');
+  assert.deepEqual(
+    (
+      await getOwnerOperation({
+        baseUrl,
+        headers: { Cookie: replacementCookie },
+        path: { key: typeKey },
+      })
+    ).data,
+    { state: 'completed', response: { status: 201, body: created.data } },
+  );
+  assert.deepEqual(
+    (
+      await createEventType({
+        baseUrl,
+        headers: { ...typeHeaders, Cookie: replacementCookie },
+        body: typeBody,
+      })
+    ).data,
+    created.data,
+  );
+  assert.equal((await eventTypesListEventTypes({ baseUrl })).data!.items.length, 1);
   console.log(
-    'Пересоздание контейнера с тем же томом сохраняет пароль, сроки, отзыв и лимит входа.',
+    'Пересоздание контейнера с тем же томом сохраняет пароль, сроки, отзыв, лимит входа, типы встреч и результаты операций.',
   );
 } finally {
   await stopApi();

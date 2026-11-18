@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { GetStatusData, GetStatusResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses } from './types.gen.js';
+import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetStatusData, GetStatusResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,6 +19,21 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export const getStatus = <ThrowOnError extends boolean = false>(options?: Options<GetStatusData, ThrowOnError>): RequestResult<GetStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetStatusResponses, unknown, ThrowOnError>({ url: '/', ...options });
+
+export const eventTypesListEventTypes = <ThrowOnError extends boolean = false>(options?: Options<EventTypesListEventTypesData, ThrowOnError>): RequestResult<EventTypesListEventTypesResponses, EventTypesListEventTypesErrors, ThrowOnError> => (options?.client ?? client).get<EventTypesListEventTypesResponses, EventTypesListEventTypesErrors, ThrowOnError>({ url: '/api/event-types', ...options });
+
+export const eventTypesGetEventType = <ThrowOnError extends boolean = false>(options: Options<EventTypesGetEventTypeData, ThrowOnError>): RequestResult<EventTypesGetEventTypeResponses, EventTypesGetEventTypeErrors, ThrowOnError> => (options.client ?? client).get<EventTypesGetEventTypeResponses, EventTypesGetEventTypeErrors, ThrowOnError>({ url: '/api/event-types/{id}', ...options });
+
+export const createEventType = <ThrowOnError extends boolean = false>(options: Options<CreateEventTypeData, ThrowOnError>): RequestResult<CreateEventTypeResponses, CreateEventTypeErrors, ThrowOnError> => (options.client ?? client).post<CreateEventTypeResponses, CreateEventTypeErrors, ThrowOnError>({
+    url: '/api/owner/event-types',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getOwnerOperation = <ThrowOnError extends boolean = false>(options: Options<GetOwnerOperationData, ThrowOnError>): RequestResult<GetOwnerOperationResponses, GetOwnerOperationErrors, ThrowOnError> => (options.client ?? client).get<GetOwnerOperationResponses, GetOwnerOperationErrors, ThrowOnError>({ url: '/api/owner/operations/{key}', ...options });
 
 export const ownerSessionLogoutOwner = <ThrowOnError extends boolean = false>(options?: Options<OwnerSessionLogoutOwnerData, ThrowOnError>): RequestResult<OwnerSessionLogoutOwnerResponses, OwnerSessionLogoutOwnerErrors, ThrowOnError> => (options?.client ?? client).delete<OwnerSessionLogoutOwnerResponses, OwnerSessionLogoutOwnerErrors, ThrowOnError>({ url: '/api/owner/session', ...options });
 
