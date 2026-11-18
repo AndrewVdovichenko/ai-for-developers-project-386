@@ -86,6 +86,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/owner/availability:
+    get:
+      operationId: OwnerAvailability_getAvailability
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: OwnerAvailability_saveAvailability
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAvailability'
   /api/owner/event-types:
     post:
       operationId: createEventType
@@ -317,6 +403,8 @@ components:
             - IDEMPOTENCY_KEY_REQUIRED
             - IDEMPOTENCY_KEY_REUSED
             - EVENT_TYPE_NOT_FOUND
+            - REVISION_CONFLICT
+            - PREVIEW_REQUIRED
         message:
           type: string
         fieldErrors:
@@ -337,6 +425,37 @@ components:
         retryAfterSeconds:
           type: integer
           format: int32
+    AvailabilityResponse:
+      type: object
+      required:
+        - availability
+        - serverNow
+      properties:
+        availability:
+          $ref: '#/components/schemas/AvailabilitySettings'
+        serverNow:
+          type: string
+    AvailabilitySettings:
+      type: object
+      required:
+        - configured
+        - timeZone
+        - revision
+        - days
+      properties:
+        configured:
+          type: boolean
+        timeZone:
+          type: string
+          nullable: true
+        revision:
+          type: integer
+          format: int32
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyDay'
+          description: 'Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.'
     CreateEventType:
       type: object
       required:
@@ -391,6 +510,7 @@ components:
         body:
           anyOf:
             - $ref: '#/components/schemas/EventTypeCreated'
+            - $ref: '#/components/schemas/AvailabilityResponse'
             - $ref: '#/components/schemas/ApiError'
     OperationResult:
       anyOf:
@@ -413,6 +533,26 @@ components:
           required:
             - state
             - response
+    SaveAvailability:
+      type: object
+      required:
+        - revision
+        - timeZone
+        - days
+      properties:
+        revision:
+          type: integer
+          format: int32
+          minimum: 0
+        timeZone:
+          type: string
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyDay'
+          description: 'Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.'
+        confirmationToken:
+          type: string
     Session:
       type: object
       required:
@@ -436,6 +576,37 @@ components:
           type: boolean
       allOf:
         - $ref: '#/components/schemas/Session'
+    WeeklyDay:
+      type: object
+      required:
+        - weekday
+        - intervals
+      properties:
+        weekday:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 7
+        intervals:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkingInterval'
+    WorkingInterval:
+      type: object
+      required:
+        - startMinute
+        - endMinute
+      properties:
+        startMinute:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1439
+        endMinute:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1440
 servers:
   - url: http://127.0.0.1:3000
     description: Локальная разработка

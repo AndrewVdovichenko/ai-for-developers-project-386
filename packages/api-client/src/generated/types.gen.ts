@@ -5,7 +5,7 @@ export type ClientOptions = {
 };
 
 export type ApiError = {
-    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND';
+    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED';
     message: string;
     fieldErrors?: Array<{
         field: string;
@@ -13,6 +13,21 @@ export type ApiError = {
         message: string;
     }>;
     retryAfterSeconds?: number;
+};
+
+export type AvailabilityResponse = {
+    availability: AvailabilitySettings;
+    serverNow: string;
+};
+
+export type AvailabilitySettings = {
+    configured: boolean;
+    timeZone: string | null;
+    revision: number;
+    /**
+     * Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.
+     */
+    days: Array<WeeklyDay>;
 };
 
 export type CreateEventType = {
@@ -40,7 +55,7 @@ export type EventTypeCreated = {
 
 export type OperationResponse = {
     status: number;
-    body: EventTypeCreated | ApiError;
+    body: EventTypeCreated | AvailabilityResponse | ApiError;
 };
 
 export type OperationResult = {
@@ -48,6 +63,16 @@ export type OperationResult = {
 } | {
     state: 'completed';
     response: OperationResponse;
+};
+
+export type SaveAvailability = {
+    revision: number;
+    timeZone: string;
+    /**
+     * Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.
+     */
+    days: Array<WeeklyDay>;
+    confirmationToken?: string;
 };
 
 export type Session = {
@@ -58,6 +83,16 @@ export type Session = {
 
 export type SessionStatus = Session & {
     configured: boolean;
+};
+
+export type WeeklyDay = {
+    weekday: number;
+    intervals: Array<WorkingInterval>;
+};
+
+export type WorkingInterval = {
+    startMinute: number;
+    endMinute: number;
 };
 
 export type GetStatusData = {
@@ -143,6 +178,87 @@ export type EventTypesGetEventTypeResponses = {
 };
 
 export type EventTypesGetEventTypeResponse = EventTypesGetEventTypeResponses[keyof EventTypesGetEventTypeResponses];
+
+export type OwnerAvailabilityGetAvailabilityData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/owner/availability';
+};
+
+export type OwnerAvailabilityGetAvailabilityErrors = {
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerAvailabilityGetAvailabilityError = OwnerAvailabilityGetAvailabilityErrors[keyof OwnerAvailabilityGetAvailabilityErrors];
+
+export type OwnerAvailabilityGetAvailabilityResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: AvailabilityResponse;
+};
+
+export type OwnerAvailabilityGetAvailabilityResponse = OwnerAvailabilityGetAvailabilityResponses[keyof OwnerAvailabilityGetAvailabilityResponses];
+
+export type OwnerAvailabilitySaveAvailabilityData = {
+    body: SaveAvailability;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/owner/availability';
+};
+
+export type OwnerAvailabilitySaveAvailabilityErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerAvailabilitySaveAvailabilityError = OwnerAvailabilitySaveAvailabilityErrors[keyof OwnerAvailabilitySaveAvailabilityErrors];
+
+export type OwnerAvailabilitySaveAvailabilityResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: AvailabilityResponse;
+};
+
+export type OwnerAvailabilitySaveAvailabilityResponse = OwnerAvailabilitySaveAvailabilityResponses[keyof OwnerAvailabilitySaveAvailabilityResponses];
 
 export type CreateEventTypeData = {
     body: CreateEventType;

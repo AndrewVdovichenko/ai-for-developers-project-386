@@ -2,6 +2,7 @@ import { Alert, Button, Container, Group, Loader, Stack, Title, Text } from '@ma
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { OwnerEventTypes } from './OwnerEventTypes';
+import { OwnerAvailability } from './OwnerAvailability';
 import { readSession, signOut } from '../owner-api';
 
 const sections = [
@@ -73,7 +74,8 @@ export function OwnerPage() {
               ))}
             </Group>
             {location.pathname === '/owner/event-types' && <OwnerEventTypes />}
-            {location.pathname !== '/owner/event-types' && (
+            {location.pathname === '/owner/availability' && <OwnerAvailability />}
+            {location.pathname === '/owner/bookings' && (
               <Text>Управление этим разделом появится на&nbsp;следующих этапах.</Text>
             )}
             <Button

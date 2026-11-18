@@ -15,7 +15,7 @@ model Session {
 }
 model SessionStatus extends Session { configured: boolean; }
 model ApiError {
-  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND";
+  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED";
   message: string;
   fieldErrors?: { field: string; code: string; message: string }[];
   retryAfterSeconds?: int32;
@@ -49,7 +49,7 @@ model CreateEventType {
 model EventTypeCreated { eventType: EventType; }
 model NotFound { @statusCode statusCode: 404; @body body: ApiError; }
 model Conflict { @statusCode statusCode: 409; @body body: ApiError; }
-model OperationResponse { status: int32; body: EventTypeCreated | ApiError; }
+model OperationResponse { status: int32; body: EventTypeCreated | AvailabilityResponse | ApiError; }
 union OperationResult {
   { state: "unknown" },
   { state: "completed"; response: OperationResponse; }
@@ -64,3 +64,30 @@ namespace EventTypes {
   { @statusCode statusCode: 201; @body body: EventTypeCreated } | BadRequest | Unauthorized | Forbidden | Conflict | Unavailable | InternalError;
 @route("/api/owner/operations/{key}")
 @get op getOwnerOperation(@path key: string): OperationResult | BadRequest | Unauthorized | Unavailable | InternalError;
+
+model WorkingInterval {
+  @minValue(0) @maxValue(1439) startMinute: int32;
+  @minValue(1) @maxValue(1440) endMinute: int32;
+}
+model WeeklyDay {
+  @minValue(1) @maxValue(7) weekday: int32;
+  intervals: WorkingInterval[];
+}
+model AvailabilitySettings {
+  configured: boolean;
+  timeZone: string | null;
+  revision: int32;
+  @doc("Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.") days: WeeklyDay[];
+}
+model AvailabilityResponse { availability: AvailabilitySettings; serverNow: string; }
+model SaveAvailability {
+  @minValue(0) revision: int32;
+  timeZone: string;
+  @doc("Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.") days: WeeklyDay[];
+  confirmationToken?: string;
+}
+@route("/api/owner/availability")
+namespace OwnerAvailability {
+  @get op getAvailability(): AvailabilityResponse | Unauthorized | Unavailable | InternalError;
+  @put op saveAvailability(@header("Idempotency-Key") key: string, @body body: SaveAvailability): AvailabilityResponse | BadRequest | Unauthorized | Forbidden | Conflict | Unavailable | InternalError;
+}
