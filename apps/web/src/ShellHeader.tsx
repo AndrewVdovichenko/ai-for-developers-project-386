@@ -10,6 +10,7 @@ export function ShellHeader() {
             Календарь&nbsp;звонков
           </Title>
         </Link>
+        <Link to="/owner/event-types">Вход Владельца</Link>
       </Group>
     </AppShell.Header>
   );

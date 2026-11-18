@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { GetStatusData, GetStatusResponses } from './types.gen.js';
+import type { GetStatusData, GetStatusResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,3 +19,16 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export const getStatus = <ThrowOnError extends boolean = false>(options?: Options<GetStatusData, ThrowOnError>): RequestResult<GetStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetStatusResponses, unknown, ThrowOnError>({ url: '/', ...options });
+
+export const ownerSessionLogoutOwner = <ThrowOnError extends boolean = false>(options?: Options<OwnerSessionLogoutOwnerData, ThrowOnError>): RequestResult<OwnerSessionLogoutOwnerResponses, OwnerSessionLogoutOwnerErrors, ThrowOnError> => (options?.client ?? client).delete<OwnerSessionLogoutOwnerResponses, OwnerSessionLogoutOwnerErrors, ThrowOnError>({ url: '/api/owner/session', ...options });
+
+export const ownerSessionGetOwnerSession = <ThrowOnError extends boolean = false>(options?: Options<OwnerSessionGetOwnerSessionData, ThrowOnError>): RequestResult<OwnerSessionGetOwnerSessionResponses, OwnerSessionGetOwnerSessionErrors, ThrowOnError> => (options?.client ?? client).get<OwnerSessionGetOwnerSessionResponses, OwnerSessionGetOwnerSessionErrors, ThrowOnError>({ url: '/api/owner/session', ...options });
+
+export const ownerSessionLoginOwner = <ThrowOnError extends boolean = false>(options: Options<OwnerSessionLoginOwnerData, ThrowOnError>): RequestResult<OwnerSessionLoginOwnerResponses, OwnerSessionLoginOwnerErrors, ThrowOnError> => (options.client ?? client).post<OwnerSessionLoginOwnerResponses, OwnerSessionLoginOwnerErrors, ThrowOnError>({
+    url: '/api/owner/session',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});

@@ -4,6 +4,22 @@ export type ClientOptions = {
     baseUrl: 'http://127.0.0.1:3000' | (string & {});
 };
 
+export type ApiError = {
+    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR';
+    message: string;
+    retryAfterSeconds?: number;
+};
+
+export type Session = {
+    authenticated: boolean;
+    expiresAt: string | null;
+    serverNow: string;
+};
+
+export type SessionStatus = Session & {
+    configured: boolean;
+};
+
 export type GetStatusData = {
     body?: never;
     path?: never;
@@ -21,3 +37,112 @@ export type GetStatusResponses = {
 };
 
 export type GetStatusResponse = GetStatusResponses[keyof GetStatusResponses];
+
+export type OwnerSessionLogoutOwnerData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/owner/session';
+};
+
+export type OwnerSessionLogoutOwnerErrors = {
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerSessionLogoutOwnerError = OwnerSessionLogoutOwnerErrors[keyof OwnerSessionLogoutOwnerErrors];
+
+export type OwnerSessionLogoutOwnerResponses = {
+    /**
+     * There is no content to send for this request, but the headers may be useful.
+     */
+    204: void;
+};
+
+export type OwnerSessionLogoutOwnerResponse = OwnerSessionLogoutOwnerResponses[keyof OwnerSessionLogoutOwnerResponses];
+
+export type OwnerSessionGetOwnerSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/owner/session';
+};
+
+export type OwnerSessionGetOwnerSessionErrors = {
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerSessionGetOwnerSessionError = OwnerSessionGetOwnerSessionErrors[keyof OwnerSessionGetOwnerSessionErrors];
+
+export type OwnerSessionGetOwnerSessionResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: SessionStatus;
+};
+
+export type OwnerSessionGetOwnerSessionResponse = OwnerSessionGetOwnerSessionResponses[keyof OwnerSessionGetOwnerSessionResponses];
+
+export type OwnerSessionLoginOwnerData = {
+    body: {
+        password: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/owner/session';
+};
+
+export type OwnerSessionLoginOwnerErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * Client error
+     */
+    429: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerSessionLoginOwnerError = OwnerSessionLoginOwnerErrors[keyof OwnerSessionLoginOwnerErrors];
+
+export type OwnerSessionLoginOwnerResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: Session;
+};
+
+export type OwnerSessionLoginOwnerResponse = OwnerSessionLoginOwnerResponses[keyof OwnerSessionLoginOwnerResponses];
