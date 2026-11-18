@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.2.0...v0.3.0) (2026-11-18)
+
+
+### Новые возможности
+
+* добавить создание типов встречи и публичный каталог ([#16](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/16)) ([f03b098](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/f03b09886200295e0a421493eb2a723bd2fe8cfa))
+* добавить типы встречи и публичный каталог ([#16](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/16)) ([be6aca7](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/be6aca72f3a2c59f282bdce232c9e98e503f96c5))
+
+
+### Исправления
+
+* сохранить полный Unicode-контракт типов встречи ([#16](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/16)) ([738c3d4](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/738c3d4169c6704e7c547cb9a3612e7ca35b647c))
+* хранить поля типов встречи как text и отклонять U+0000 ([#16](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/16)) ([40aad75](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/40aad75ff4905474f968b176b8f4b194affc8e7f))
+
 ## [0.2.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.1.0...v0.2.0) (2026-11-18)
 
 
