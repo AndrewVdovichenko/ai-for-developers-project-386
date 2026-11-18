@@ -5,6 +5,8 @@
     "**/generated/**",
     "**/dist/**",
     "yarn.lock",
+    "CHANGELOG.md",
+    ".release-please-manifest.json",
     ".github/workflows/hexlet-check.yml"
   ]
 }
