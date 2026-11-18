@@ -345,8 +345,12 @@ components:
       properties:
         name:
           type: string
+          pattern: ^[^\u0000]*$
+          description: 'Название после trim: 1–100 кодовых точек; U+0000 запрещён.'
         description:
           type: string
+          pattern: ^[^\u0000]*$
+          description: До 2000 кодовых точек; переносы сохраняются, U+0000 запрещён.
         durationMinutes:
           type: integer
           format: int32

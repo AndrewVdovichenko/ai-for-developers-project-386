@@ -16,7 +16,13 @@ export type ApiError = {
 };
 
 export type CreateEventType = {
+    /**
+     * Название после trim: 1–100 кодовых точек; U+0000 запрещён.
+     */
     name: string;
+    /**
+     * До 2000 кодовых точек; переносы сохраняются, U+0000 запрещён.
+     */
     description?: string;
     durationMinutes: number;
 };

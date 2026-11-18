@@ -362,107 +362,125 @@ test('технический откат не оставляет тип или 
   }
 });
 
-test.each([
-  { name: '\u0000😀\\u0000"\nТип', description: '\u0000\n\\u0000\t"😀', durationMinutes: 1 },
-  { name: '\u0000'.repeat(100), description: '\u0000'.repeat(2000), durationMinutes: 1 },
-  {
-    name: '\\u0000'.repeat(16) + '1234',
-    description: '\\u0000'.repeat(333) + '12',
-    durationMinutes: 1,
+test.each(['name', 'description'] as const)(
+  'U+0000 в поле %s даёт сохранённую ошибку валидации',
+  async (field) => {
+    const f = await fixture();
+    try {
+      const key = randomUUID();
+      const body = {
+        name: 'Тип 😀',
+        description: 'Первая строка\nВторая строка',
+        durationMinutes: 30,
+        [field]: 'До\u0000после',
+      };
+      const send = (operationKey: string, parameters = body) =>
+        createEventType({
+          ...f,
+          headers: { ...f.headers, 'Idempotency-Key': operationKey },
+          body: parameters,
+        });
+      const result = await send(key);
+      expect(result.response!.status).toBe(400);
+      expect(result.error).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        fieldErrors: [expect.objectContaining({ field, code: 'INVALID_VALUE' })],
+      });
+      expect((await getOwnerOperation({ ...f, path: { key } })).data).toEqual({
+        state: 'completed',
+        response: { status: 400, body: result.error },
+      });
+      expect((await send(key)).error).toEqual(result.error);
+      expect((await eventTypesListEventTypes({ baseUrl: f.baseUrl })).data).toEqual({ items: [] });
+      const corrected = {
+        name: 'Тип 😀',
+        description: 'Первая строка\nЛитеральное \\u0000',
+        durationMinutes: 30,
+      };
+      expect((await send(key, corrected)).error?.code).toBe('IDEMPOTENCY_KEY_REUSED');
+      expect((await send(randomUUID(), corrected)).data?.eventType).toMatchObject(corrected);
+    } finally {
+      await f.close();
+    }
   },
-])('Тип встречи сохраняет U+0000 и JSON-экранирование как обычный Unicode-текст', async (body) => {
-  const f = await fixture();
-  try {
-    const key = randomUUID();
-    const result = await createEventType({
-      ...f,
-      headers: { ...f.headers, 'Idempotency-Key': key },
-      body,
-    });
-    expect(result.response!.status).toBe(201);
-    expect(result.data!.eventType).toMatchObject(body);
-    expect((await eventTypesListEventTypes({ baseUrl: f.baseUrl })).data).toEqual({
-      items: [result.data!.eventType],
-    });
-    expect((await getOwnerOperation({ ...f, path: { key } })).data).toEqual({
-      state: 'completed',
-      response: { status: 201, body: result.data },
-    });
-    expect(
-      (await createEventType({ ...f, headers: { ...f.headers, 'Idempotency-Key': key }, body }))
-        .data,
-    ).toEqual(result.data);
-  } finally {
-    await f.close();
-  }
-});
+);
 
-test('миграция JSON сохраняет существующие типы и результаты с другим порядком полей', async () => {
-  const db = await testDatabase();
-  const directory = await mkdtemp(join(tmpdir(), 'calendar-event-upgrade-'));
-  const key = randomUUID();
-  const id = randomUUID();
-  let app: ReturnType<typeof createApp> | undefined;
-  try {
-    for (const name of ['001-access.sql', '002-event-types.sql'])
-      await writeFile(
-        join(directory, name),
-        await readFile(new URL(`../migrations/${name}`, import.meta.url)),
+test.each(['text', 'json'] as const)(
+  'переход с %s на text сохраняет типы и результаты операций',
+  async (storage) => {
+    const db = await testDatabase();
+    const directory = await mkdtemp(join(tmpdir(), 'calendar-event-upgrade-'));
+    const key = randomUUID();
+    const id = randomUUID();
+    let app: ReturnType<typeof createApp> | undefined;
+    try {
+      const versions = ['001-access.sql', '002-event-types.sql'];
+      if (storage === 'json') versions.push('003-operation-json.sql', '004-event-type-unicode.sql');
+      for (const name of versions)
+        await writeFile(
+          join(directory, name),
+          await readFile(new URL(`../migrations/${name}`, import.meta.url)),
+        );
+      await migrate(db.pool, pathToFileURL(`${directory}/`));
+      const eventType = {
+        id,
+        name: 'Старый тип 😀',
+        description: '\nОписание\\n',
+        durationMinutes: 30,
+      };
+      await db.pool.query(
+        'INSERT INTO event_types (id, name, description, duration_minutes) VALUES ($1, $2, $3, $4)',
+        [
+          id,
+          storage === 'json' ? JSON.stringify(eventType.name) : eventType.name,
+          storage === 'json' ? JSON.stringify(eventType.description) : eventType.description,
+          30,
+        ],
       );
-    await migrate(db.pool, pathToFileURL(`${directory}/`));
-    const eventType = {
-      id,
-      name: 'Старый тип 😀',
-      description: '\nОписание\\n',
-      durationMinutes: 30,
-    };
-    await db.pool.query(
-      'INSERT INTO event_types (id, name, description, duration_minutes) VALUES ($1, $2, $3, $4)',
-      [id, eventType.name, eventType.description, 30],
-    );
-    await db.pool.query(
-      'INSERT INTO operations (subject, key, action, parameters, status, body) VALUES ($1, $2, $3, $4, $5, $6)',
-      [
-        'owner:1',
-        key,
-        'createEventType',
-        JSON.stringify({
-          durationMinutes: 30,
-          description: eventType.description,
-          name: eventType.name,
-        }),
-        201,
-        JSON.stringify({ eventType }),
-      ],
-    );
-    await db.migrate();
-    const password = 'длинный пароль миграции'; // betterleaks:allow -- public test fixture
-    await resetPassword(db.pool, password, password);
-    app = createApp({ pool: db.pool, origin });
-    const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
-    const login = await ownerSessionLoginOwner({
-      baseUrl,
-      body: { password },
-      headers: { Origin: origin },
-    });
-    const headers = {
-      Origin: origin,
-      Cookie: login.response!.headers.get('set-cookie')!.split(';')[0]!,
-      'Idempotency-Key': key,
-    };
-    expect(
-      (
-        await createEventType({
-          baseUrl,
-          headers,
-          body: { name: eventType.name, description: eventType.description, durationMinutes: 30 },
-        })
-      ).data,
-    ).toEqual({ eventType });
-    expect((await eventTypesListEventTypes({ baseUrl })).data).toEqual({ items: [eventType] });
-  } finally {
-    await app?.close();
-    await db.close();
-    await rm(directory, { recursive: true });
-  }
-});
+      await db.pool.query(
+        'INSERT INTO operations (subject, key, action, parameters, status, body) VALUES ($1, $2, $3, $4, $5, $6)',
+        [
+          'owner:1',
+          key,
+          'createEventType',
+          JSON.stringify({
+            durationMinutes: 30,
+            description: eventType.description,
+            name: eventType.name,
+          }),
+          201,
+          JSON.stringify({ eventType }),
+        ],
+      );
+      await db.migrate();
+      const password = 'длинный пароль миграции'; // betterleaks:allow -- public test fixture
+      await resetPassword(db.pool, password, password);
+      app = createApp({ pool: db.pool, origin });
+      const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
+      const login = await ownerSessionLoginOwner({
+        baseUrl,
+        body: { password },
+        headers: { Origin: origin },
+      });
+      const headers = {
+        Origin: origin,
+        Cookie: login.response!.headers.get('set-cookie')!.split(';')[0]!,
+        'Idempotency-Key': key,
+      };
+      expect(
+        (
+          await createEventType({
+            baseUrl,
+            headers,
+            body: { name: eventType.name, description: eventType.description, durationMinutes: 30 },
+          })
+        ).data,
+      ).toEqual({ eventType });
+      expect((await eventTypesListEventTypes({ baseUrl })).data).toEqual({ items: [eventType] });
+    } finally {
+      await app?.close();
+      await db.close();
+      await rm(directory, { recursive: true });
+    }
+  },
+);

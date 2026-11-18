@@ -38,6 +38,9 @@ export function createEventType(pool: pg.Pool, key: unknown, input: unknown) {
         invalid('name', 'Название должно содержать от 1 до 100 символов');
       if (typeof fields.description !== 'string' || [...fields.description].length > 2000)
         invalid('description', 'Описание должно содержать до 2000 символов');
+      for (const field of ['name', 'description'] as const)
+        if (typeof fields[field] === 'string' && fields[field].includes('\u0000'))
+          invalid(field, 'Символ U+0000 недопустим');
       if (
         typeof fields.durationMinutes !== 'number' ||
         !Number.isInteger(fields.durationMinutes) ||
@@ -52,12 +55,7 @@ export function createEventType(pool: pg.Pool, key: unknown, input: unknown) {
         };
       const result = await client.query(
         `INSERT INTO event_types (id, name, description, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING ${columns}`,
-        [
-          randomUUID(),
-          JSON.stringify(fields.name),
-          JSON.stringify(fields.description),
-          fields.durationMinutes,
-        ],
+        [randomUUID(), fields.name, fields.description, fields.durationMinutes],
       );
       return { status: 201, body: { eventType: result.rows[0] } };
     },

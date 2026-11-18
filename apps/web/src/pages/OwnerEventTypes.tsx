@@ -155,6 +155,8 @@ export function OwnerEventTypes() {
         errors.name = 'Название должно содержать от 1 до 100 символов';
       if ([...draft.description].length > 2000)
         errors.description = 'Описание должно содержать до 2000 символов';
+      for (const field of ['name', 'description'] as const)
+        if (draft[field].includes('\u0000')) errors[field] = 'Символ U+0000 недопустим';
       const durationMinutes = /^\d+$/.test(draft.duration) ? Number(draft.duration) : NaN;
       if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) {
         errors.durationMinutes = 'Длительность — целое число от 1 до 1440 минут';

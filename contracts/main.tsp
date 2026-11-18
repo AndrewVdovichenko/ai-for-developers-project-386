@@ -40,8 +40,10 @@ model EventType {
   durationMinutes: int32;
 }
 model CreateEventType {
-  name: string;
-  description?: string;
+  @doc("Название после trim: 1–100 кодовых точек; U+0000 запрещён.")
+  @pattern("^[^\\u0000]*$") name: string;
+  @doc("До 2000 кодовых точек; переносы сохраняются, U+0000 запрещён.")
+  @pattern("^[^\\u0000]*$") description?: string;
   durationMinutes: int32;
 }
 model EventTypeCreated { eventType: EventType; }

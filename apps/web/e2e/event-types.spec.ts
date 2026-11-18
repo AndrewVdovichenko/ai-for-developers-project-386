@@ -62,6 +62,23 @@ test('создание, ошибки полей, копирование, пря�
   await expect(page.getByText(/Название должно содержать/)).toBeVisible();
 });
 
+test('U+0000 отклоняется рядом с полем до отправки запроса', async ({ page }) => {
+  await login(page);
+  let posts = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/api/owner/event-types')) posts++;
+  });
+  for (const label of ['Название', 'Описание']) {
+    await fill(page, 'Тип 😀');
+    await page.getByLabel(label).fill('До\u0000после');
+    await page.getByRole('button', { name: 'Создать тип встречи' }).click();
+    await expect(page.getByLabel(label)).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByText('Символ U+0000 недопустим')).toBeVisible();
+    await expect(page.getByLabel(label)).toHaveValue('До\u0000после');
+  }
+  expect(posts).toBe(0);
+});
+
 test('потеря ответа после commit: перезагрузка и ручная проверка не создают дубликат', async ({
   page,
 }) => {
