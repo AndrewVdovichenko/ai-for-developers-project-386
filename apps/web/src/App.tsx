@@ -1,3 +1,4 @@
+import { BookingResultPage } from './pages/BookingResultPage';
 import { MantineProvider } from '@mantine/core';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router';
 import { BookingPage } from './pages/BookingPage';
@@ -11,6 +12,7 @@ const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
   { path: '/booking', element: <Navigate to="/event-types" replace /> },
   { path: '/event-types', element: <EventTypesPage /> },
+  { path: '/bookings/:id', element: <BookingResultPage /> },
   { path: '/booking/:id', element: <BookingPage /> },
   { path: '/owner/login', element: <OwnerLoginPage /> },
   { path: '/owner/event-types', element: <OwnerPage /> },

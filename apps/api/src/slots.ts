@@ -19,7 +19,7 @@ export async function getSlotAvailability(pool: pg.Pool, id: string, now: () => 
   const result = calculateSlots(settings, type.durationMinutes, snapshot);
   const occupied = (
     await pool.query<{ startsAt: Date; endsAt: Date }>(
-      `SELECT starts_at AS "startsAt", ends_at AS "endsAt" FROM holds WHERE state='active' AND expires_at>$1`,
+      `SELECT starts_at AS "startsAt", ends_at AS "endsAt" FROM holds WHERE state='active' AND expires_at>$1 UNION ALL SELECT starts_at AS "startsAt", ends_at AS "endsAt" FROM bookings`,
       [snapshot],
     )
   ).rows;

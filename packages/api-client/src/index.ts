@@ -1,4 +1,6 @@
 export {
+  confirmHold,
+  getBooking,
   guestSessionPrepareGuest,
   guestSessionVerifyGuest,
   selectHold,
@@ -19,6 +21,9 @@ export {
   ownerSessionLogoutOwner,
 } from './generated/sdk.gen.js';
 export type {
+  Booking,
+  BookingResponse,
+  ConfirmBooking,
   Hold,
   HoldResponse,
   Slot,

@@ -22,6 +22,40 @@ paths:
                       - ok
                 required:
                   - status
+  /api/bookings/{id}:
+    get:
+      operationId: getBooking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/event-types:
     get:
       operationId: EventTypes_listEventTypes
@@ -339,6 +373,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/holds/{id}/confirm:
+    post:
+      operationId: confirmHold
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmBooking'
   /api/holds/{id}/release:
     post:
       operationId: releaseHold
@@ -773,6 +876,9 @@ components:
             - SLOT_STARTED
             - SLOT_NO_LONGER_OFFERED
             - HOLD_ALREADY_CONFIRMED
+            - HOLD_REPLACED
+            - HOLD_RELEASED
+            - BOOKING_UNAVAILABLE
         message:
           type: string
         fieldErrors:
@@ -824,6 +930,56 @@ components:
           items:
             $ref: '#/components/schemas/WeeklyDay'
           description: 'Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.'
+    Booking:
+      type: object
+      required:
+        - id
+        - holdId
+        - eventTypeId
+        - eventTypeName
+        - startsAt
+        - endsAt
+        - guestName
+        - guestEmail
+      properties:
+        id:
+          type: string
+        holdId:
+          type: string
+        eventTypeId:
+          type: string
+        eventTypeName:
+          type: string
+        startsAt:
+          $ref: '#/components/schemas/UtcInstant'
+        endsAt:
+          $ref: '#/components/schemas/UtcInstant'
+        guestName:
+          type: string
+        guestEmail:
+          type: string
+    BookingResponse:
+      type: object
+      required:
+        - booking
+        - serverNow
+      properties:
+        booking:
+          $ref: '#/components/schemas/Booking'
+        serverNow:
+          $ref: '#/components/schemas/UtcInstant'
+    ConfirmBooking:
+      type: object
+      required:
+        - guestName
+        - guestEmail
+      properties:
+        guestName:
+          type: string
+          description: 'Обязательное имя: 1–100 кодовых точек после trim.'
+        guestEmail:
+          type: string
+          description: До 254 кодовых точек после trim; регистр сохраняется, формат ^[^\s@]+@[^\s@]+\.[^\s@]+$ с флагом u.
     CreateEventType:
       type: object
       required:
@@ -922,6 +1078,7 @@ components:
             - $ref: '#/components/schemas/EventTypeCreated'
             - $ref: '#/components/schemas/AvailabilityResponse'
             - $ref: '#/components/schemas/HoldResponse'
+            - $ref: '#/components/schemas/BookingResponse'
             - $ref: '#/components/schemas/ApiError'
     OperationResult:
       anyOf:

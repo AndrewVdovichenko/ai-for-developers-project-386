@@ -1,3 +1,4 @@
+import { confirmHold, readBooking } from './bookings.js';
 import { guest, guestSecret, prepareGuest, requireGuest } from './guests.js';
 import { guestSubject, readHold, selectHold, releaseHold } from './holds.js';
 import Fastify from 'fastify';
@@ -163,6 +164,26 @@ export function createApp(options: {
     );
     return reply.code(result.status).send(result.body);
   });
+  app.post<{ Params: { id: string } }>('/api/holds/:id/confirm', async (request, reply) => {
+    const result = await confirmHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      request.params.id,
+      request.headers['idempotency-key'],
+      request.body,
+      options.decisionNow,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.get<{ Params: { id: string } }>('/api/bookings/:id', async (request) =>
+    readBooking(
+      options.pool,
+      request.params.id,
+      await guestId(request.headers.cookie),
+      (await session(options.pool, secretFrom(request.headers.cookie), now)).authenticated,
+      options.decisionNow,
+    ),
+  );
   app.get('/api/holds/current', async (request) =>
     readHold(
       options.pool,
