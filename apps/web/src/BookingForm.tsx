@@ -58,7 +58,7 @@ export function BookingForm({
             event.preventDefault();
             void submit();
           }}
-          aria-label="Данные для записи"
+          aria-label="Данные для записи"
         >
           <Stack>
             <TextInput

@@ -48,6 +48,33 @@ export function BookingCalendar({ id }: { id: string }) {
       : 0;
     setRemaining(Math.max(0, Math.ceil((deadline.current - performance.now()) / 1000)));
   }, []);
+  const completeSelection = useCallback(
+    (result: { data?: unknown; error?: unknown; response?: { status: number } }) => {
+      const status = result.response?.status;
+      if (
+        !result.data &&
+        !(result.error && status !== undefined && status >= 400 && status < 500 && status !== 401)
+      )
+        return false;
+      storage.current?.clear();
+      setUnresolved(false);
+      return true;
+    },
+    [],
+  );
+  const readCurrentHold = useCallback(
+    async (isCurrent: () => boolean, failureMessage?: string) => {
+      // Operation responses are historical; only this read represents the current choice.
+      const current = await getCurrentHold({
+        baseUrl: location.origin,
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!isCurrent()) return;
+      if (current.data) showHold(current.data.hold, current.data.serverNow);
+      else if (failureMessage) throw new Error(failureMessage);
+    },
+    [showHold],
+  );
   useEffect(() => {
     storage.current = operationStorage('guest-selection', 'guest_selection', (context) => context);
     let active = true;
@@ -68,8 +95,8 @@ export function BookingCalendar({ id }: { id: string }) {
               setMessage(response.body.message);
               window.dispatchEvent(new Event('calendar:availability-conflict'));
             }
-            storage.current?.clear();
-            setUnresolved(false);
+            // A completed lookup is authoritative even when its saved response is an error.
+            completeSelection({ data: response });
           } else if (result.data?.state === 'unknown') {
             const verified = await guestSessionVerifyGuest({
               baseUrl: location.origin,
@@ -89,29 +116,16 @@ export function BookingCalendar({ id }: { id: string }) {
                     ...options,
                     body: { eventTypeId: context.eventTypeId, startsAt: context.startsAt },
                   });
-            if (
-              replay.data ||
-              (replay.error &&
-                replay.response!.status >= 400 &&
-                replay.response!.status < 500 &&
-                replay.response!.status !== 401)
-            ) {
+            if (completeSelection(replay)) {
               if (replay.error) {
                 setMessage(replay.error.message);
                 window.dispatchEvent(new Event('calendar:availability-conflict'));
               }
-              storage.current?.clear();
-              setUnresolved(false);
             } else throw new Error('Исход выбора пока неизвестен');
           }
         }
         if (storage.current?.load()) throw new Error('Исход выбора пока неизвестен');
-        const current = await getCurrentHold({
-          baseUrl: location.origin,
-          signal: AbortSignal.timeout(15000),
-        });
-        if (active && epoch === holdEpoch.current && current.data)
-          showHold(current.data.hold, current.data.serverNow);
+        await readCurrentHold(() => active && epoch === holdEpoch.current);
       } catch {
         if (active && epoch === holdEpoch.current)
           setMessage('Не удалось восстановить выбор. Обновите страницу для повторной проверки.');
@@ -179,10 +193,10 @@ export function BookingCalendar({ id }: { id: string }) {
       window.removeEventListener('storage', visible);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [showHold]);
+  }, [completeSelection, readCurrentHold, showHold]);
   const choose = async (slot: Slot) => {
     if (working.current || storage.current?.load()) return;
-    holdEpoch.current++;
+    const epoch = ++holdEpoch.current;
     working.current = true;
     setBusy(true);
     setMessage('');
@@ -206,29 +220,19 @@ export function BookingCalendar({ id }: { id: string }) {
         body: { eventTypeId: id, startsAt: slot.startsAt },
         signal: AbortSignal.timeout(15000),
       });
+      if (!completeSelection(result))
+        throw new Error('Ответ потерян. Обновите страницу для проверки результата.');
       if (result.data) {
-        storage.current.clear();
-        setUnresolved(false);
-        const current = await getCurrentHold({
-          baseUrl: location.origin,
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!current.data)
-          throw new Error('Выбор сохранён. Не удалось обновить актуальное Бронирование.');
-        showHold(current.data.hold, current.data.serverNow);
+        await readCurrentHold(
+          () => epoch === holdEpoch.current,
+          'Выбор сохранён. Не удалось обновить актуальное Бронирование.',
+        );
         setPicking(false);
         if (confirmationStorage().load()?.bookingId) confirmationStorage().clear();
-      } else if (
-        result.error &&
-        result.response!.status >= 400 &&
-        result.response!.status < 500 &&
-        result.response!.status !== 401
-      ) {
-        storage.current.clear();
-        setUnresolved(false);
-        setMessage(result.error.message);
+      } else {
+        setMessage(result.error!.message);
         window.dispatchEvent(new Event('calendar:availability-conflict'));
-      } else throw new Error('Ответ потерян. Обновите страницу для проверки результата.');
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось выполнить выбор');
     } finally {
@@ -238,7 +242,7 @@ export function BookingCalendar({ id }: { id: string }) {
   };
   const release = async () => {
     if (!hold || working.current || storage.current?.load()) return;
-    holdEpoch.current++;
+    const epoch = ++holdEpoch.current;
     working.current = true;
     setBusy(true);
     setMessage('');
@@ -261,24 +265,12 @@ export function BookingCalendar({ id }: { id: string }) {
         body: {},
         signal: AbortSignal.timeout(15000),
       });
-      if (
-        result.data ||
-        (result.error &&
-          result.response!.status >= 400 &&
-          result.response!.status < 500 &&
-          result.response!.status !== 401)
-      ) {
-        storage.current.clear();
-        setUnresolved(false);
+      if (completeSelection(result)) {
         if (result.data) {
-          // A completed operation is historical: read the current choice after any concurrent replacement.
-          const current = await getCurrentHold({
-            baseUrl: location.origin,
-            signal: AbortSignal.timeout(15000),
-          });
-          if (!current.data)
-            throw new Error('Освобождение сохранено. Не удалось обновить актуальное Бронирование.');
-          showHold(current.data.hold, current.data.serverNow);
+          await readCurrentHold(
+            () => epoch === holdEpoch.current,
+            'Освобождение сохранено. Не удалось обновить актуальное Бронирование.',
+          );
           setPicking(false);
           window.dispatchEvent(new Event('calendar:availability-conflict'));
         } else setMessage(result.error!.message);
