@@ -15,7 +15,7 @@ model Session {
 }
 model SessionStatus extends Session { configured: boolean; }
 model ApiError {
-  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED" | "GUEST_SESSION_REQUIRED" | "HOLD_UNAVAILABLE" | "SLOT_UNAVAILABLE" | "SLOT_STARTED" | "SLOT_NO_LONGER_OFFERED" | "HOLD_ALREADY_CONFIRMED" | "HOLD_REPLACED" | "HOLD_RELEASED" | "BOOKING_UNAVAILABLE";
+  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED" | "GUEST_SESSION_REQUIRED" | "HOLD_UNAVAILABLE" | "SLOT_UNAVAILABLE" | "SLOT_STARTED" | "SLOT_NO_LONGER_OFFERED" | "HOLD_ALREADY_CONFIRMED" | "HOLD_REPLACED" | "HOLD_RELEASED" | "BOOKING_UNAVAILABLE" | "INVALID_FILTER";
   message: string;
   fieldErrors?: { field: string; code: string; message: string }[];
   retryAfterSeconds?: int32;
@@ -145,3 +145,8 @@ model ConfirmBooking {
 }
 @route("/api/holds/{id}/confirm") @post op confirmHold(@path id: string, @header("Idempotency-Key") key: string, @body body: ConfirmBooking): BookingResponse | BadRequest | Unauthorized | Forbidden | NotFound | Conflict | Unavailable | InternalError;
 @route("/api/bookings/{id}") @get op getBooking(@path id: string): BookingResponse | NotFound | Unavailable | InternalError;
+
+model OwnerBookings { items: Booking[]; serverNow: UtcInstant; }
+@route("/api/owner/bookings") @get op listOwnerBookings(
+  @query(#{ explode: true }) eventTypeId?: string[],
+): OwnerBookings | BadRequest | Unauthorized | Unavailable | InternalError;
