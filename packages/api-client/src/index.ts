@@ -1,4 +1,10 @@
 export {
+  guestSessionPrepareGuest,
+  guestSessionVerifyGuest,
+  selectHold,
+  getHold,
+  getCurrentHold,
+  getGuestOperation,
   getStatus,
   getSlotAvailability,
   createEventType,
@@ -12,6 +18,8 @@ export {
   ownerSessionLogoutOwner,
 } from './generated/sdk.gen.js';
 export type {
+  Hold,
+  HoldResponse,
   Slot,
   SlotAvailability,
   EventType,

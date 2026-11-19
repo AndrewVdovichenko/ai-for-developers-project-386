@@ -12,6 +12,7 @@ try {
     pool: db.pool,
     origin: 'http://127.0.0.1:4174',
     now: () => new Date('2026-10-24T22:00:00.000Z'),
+    decisionNow: () => new Date('2026-10-24T22:00:00.000Z'),
   });
   for (const signal of ['SIGTERM', 'SIGINT'] as const)
     process.once(signal, () => {

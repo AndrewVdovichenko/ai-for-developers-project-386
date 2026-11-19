@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetSlotAvailabilityData, GetSlotAvailabilityErrors, GetSlotAvailabilityResponses, GetStatusData, GetStatusResponses, OwnerAvailabilityGetAvailabilityData, OwnerAvailabilityGetAvailabilityErrors, OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilitySaveAvailabilityData, OwnerAvailabilitySaveAvailabilityErrors, OwnerAvailabilitySaveAvailabilityResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses } from './types.gen.js';
+import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetCurrentHoldData, GetCurrentHoldErrors, GetCurrentHoldResponses, GetGuestOperationData, GetGuestOperationErrors, GetGuestOperationResponses, GetHoldData, GetHoldErrors, GetHoldResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetSlotAvailabilityData, GetSlotAvailabilityErrors, GetSlotAvailabilityResponses, GetStatusData, GetStatusResponses, GuestSessionPrepareGuestData, GuestSessionPrepareGuestErrors, GuestSessionPrepareGuestResponses, GuestSessionVerifyGuestData, GuestSessionVerifyGuestErrors, GuestSessionVerifyGuestResponses, OwnerAvailabilityGetAvailabilityData, OwnerAvailabilityGetAvailabilityErrors, OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilitySaveAvailabilityData, OwnerAvailabilitySaveAvailabilityErrors, OwnerAvailabilitySaveAvailabilityResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses, SelectHoldData, SelectHoldErrors, SelectHoldResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -25,6 +25,32 @@ export const eventTypesListEventTypes = <ThrowOnError extends boolean = false>(o
 export const eventTypesGetEventType = <ThrowOnError extends boolean = false>(options: Options<EventTypesGetEventTypeData, ThrowOnError>): RequestResult<EventTypesGetEventTypeResponses, EventTypesGetEventTypeErrors, ThrowOnError> => (options.client ?? client).get<EventTypesGetEventTypeResponses, EventTypesGetEventTypeErrors, ThrowOnError>({ url: '/api/event-types/{id}', ...options });
 
 export const getSlotAvailability = <ThrowOnError extends boolean = false>(options: Options<GetSlotAvailabilityData, ThrowOnError>): RequestResult<GetSlotAvailabilityResponses, GetSlotAvailabilityErrors, ThrowOnError> => (options.client ?? client).get<GetSlotAvailabilityResponses, GetSlotAvailabilityErrors, ThrowOnError>({ url: '/api/event-types/{id}/availability', ...options });
+
+export const guestSessionVerifyGuest = <ThrowOnError extends boolean = false>(options?: Options<GuestSessionVerifyGuestData, ThrowOnError>): RequestResult<GuestSessionVerifyGuestResponses, GuestSessionVerifyGuestErrors, ThrowOnError> => (options?.client ?? client).get<GuestSessionVerifyGuestResponses, GuestSessionVerifyGuestErrors, ThrowOnError>({ url: '/api/guest-session', ...options });
+
+export const guestSessionPrepareGuest = <ThrowOnError extends boolean = false>(options: Options<GuestSessionPrepareGuestData, ThrowOnError>): RequestResult<GuestSessionPrepareGuestResponses, GuestSessionPrepareGuestErrors, ThrowOnError> => (options.client ?? client).post<GuestSessionPrepareGuestResponses, GuestSessionPrepareGuestErrors, ThrowOnError>({
+    url: '/api/guest-session',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const selectHold = <ThrowOnError extends boolean = false>(options: Options<SelectHoldData, ThrowOnError>): RequestResult<SelectHoldResponses, SelectHoldErrors, ThrowOnError> => (options.client ?? client).post<SelectHoldResponses, SelectHoldErrors, ThrowOnError>({
+    url: '/api/holds',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getCurrentHold = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentHoldData, ThrowOnError>): RequestResult<GetCurrentHoldResponses, GetCurrentHoldErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentHoldResponses, GetCurrentHoldErrors, ThrowOnError>({ url: '/api/holds/current', ...options });
+
+export const getHold = <ThrowOnError extends boolean = false>(options: Options<GetHoldData, ThrowOnError>): RequestResult<GetHoldResponses, GetHoldErrors, ThrowOnError> => (options.client ?? client).get<GetHoldResponses, GetHoldErrors, ThrowOnError>({ url: '/api/holds/{id}', ...options });
+
+export const getGuestOperation = <ThrowOnError extends boolean = false>(options: Options<GetGuestOperationData, ThrowOnError>): RequestResult<GetGuestOperationResponses, GetGuestOperationErrors, ThrowOnError> => (options.client ?? client).get<GetGuestOperationResponses, GetGuestOperationErrors, ThrowOnError>({ url: '/api/operations/{key}', ...options });
 
 export const ownerAvailabilityGetAvailability = <ThrowOnError extends boolean = false>(options?: Options<OwnerAvailabilityGetAvailabilityData, ThrowOnError>): RequestResult<OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilityGetAvailabilityErrors, ThrowOnError> => (options?.client ?? client).get<OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilityGetAvailabilityErrors, ThrowOnError>({ url: '/api/owner/availability', ...options });
 

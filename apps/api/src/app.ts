@@ -1,3 +1,5 @@
+import { guest, guestSecret, prepareGuest, requireGuest } from './guests.js';
+import { guestSubject, readHold, selectHold } from './holds.js';
 import Fastify from 'fastify';
 import { getSlotAvailability } from './slots.js';
 import pg from 'pg';
@@ -12,6 +14,7 @@ export function createApp(options: {
   origin: string;
   now?: () => Date;
   trustProxy?: string[];
+  decisionNow?: () => Date;
 }) {
   const now = options.now ?? (() => new Date());
   const origin = new URL(options.origin);
@@ -115,6 +118,63 @@ export function createApp(options: {
     await logout(options.pool, secretFrom(request.headers.cookie));
     return reply.header('Set-Cookie', cookie('', 0)).code(204).send();
   });
+  const guestId = (header?: string) => guest(options.pool, guestSecret(header, secure), now());
+  app.get('/api/guest-session', async (request) => ({
+    ready: !!(await guestId(request.headers.cookie)),
+  }));
+  app.post('/api/guest-session', async (request, reply) => {
+    if (
+      !request.body ||
+      typeof request.body !== 'object' ||
+      Array.isArray(request.body) ||
+      Object.keys(request.body).length
+    )
+      throw new AccessError(400, 'INVALID_REQUEST', 'Требуется пустой объект');
+    const secret = await prepareGuest(
+      options.pool,
+      guestSecret(request.headers.cookie, secure),
+      now(),
+    );
+    if (secret)
+      reply.header(
+        'Set-Cookie',
+        `${secure ? '__Host-guest_session' : 'guest_session'}=${secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure ? '; Secure' : ''}`,
+      );
+    return { ready: true };
+  });
+  app.post('/api/holds', async (request, reply) => {
+    const result = await selectHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      request.headers['idempotency-key'],
+      request.body,
+      options.decisionNow,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/holds/current', async (request) =>
+    readHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      undefined,
+      options.decisionNow,
+    ),
+  );
+  app.get<{ Params: { id: string } }>('/api/holds/:id', async (request) =>
+    readHold(
+      options.pool,
+      await guestId(request.headers.cookie),
+      request.params.id,
+      options.decisionNow,
+    ),
+  );
+  app.get<{ Params: { key: string } }>('/api/operations/:key', async (request) =>
+    readOperation(
+      options.pool,
+      guestSubject(requireGuest(await guestId(request.headers.cookie))),
+      request.params.key,
+    ),
+  );
   app.get('/api/event-types', () => listEventTypes(options.pool));
   app.get('/api/owner/availability', () => getAvailability(options.pool));
   app.put('/api/owner/availability', async (request, reply) => {
