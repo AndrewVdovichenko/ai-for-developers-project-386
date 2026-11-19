@@ -1200,7 +1200,7 @@ for (const confirmFirst of [true, false])
     }
   });
 
-test('Решение до срока коммитится после срока без повторного изменения времени решения', async () => {
+test('Потеря ответа выполняющегося подтверждения не отменяет commit; результат восстанавливается после перезапуска', async () => {
   const f = await fixture();
   try {
     await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
@@ -1226,18 +1226,27 @@ test('Решение до срока коммитится после срок�
         path: { id: hold.id },
         body: { guestName: 'Гость', guestEmail: 'a@b.c' },
       };
-    const pending = confirmHold(options);
+    const controller = new AbortController();
+    const pending = confirmHold({ ...options, signal: controller.signal });
     try {
       await waitForLock(f);
       f.setClock(hold.expiresAt);
       expect(
         (await getGuestOperation({ baseUrl: f.baseUrl, headers, path: { key } })).data!.state,
       ).toBe('unknown');
+      controller.abort();
+      expect((await pending).data).toBeUndefined();
     } finally {
       await blocker.query('SELECT pg_advisory_unlock(386,21)');
       blocker.release();
     }
-    const result = await pending;
+    await expect
+      .poll(
+        async () =>
+          (await getGuestOperation({ baseUrl: f.baseUrl, headers, path: { key } })).data!.state,
+      )
+      .toBe('completed');
+    const result = await confirmHold(options);
     expect(result.response!.status).toBe(200);
     expect(result.data!.serverNow).toBe('2026-11-17T04:14:59.999Z');
     expect(

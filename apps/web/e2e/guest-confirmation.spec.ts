@@ -86,25 +86,26 @@ test('форма сохраняется при смене Слота и обн
   await expect(page.getByLabel('Имя', { exact: true })).toHaveValue('');
 });
 
-for (const cookieOnly of [false, true])
-  test(`потерянный commit блокирует изменение формы; восстановление ${cookieOnly ? 'cookie' : 'localStorage'}`, async ({
+for (const mode of ['localStorage', 'sessionStorage', 'cookie'] as const)
+  test(`потерянный commit блокирует изменение формы; восстановление ${mode}`, async ({
     page,
     context,
   }) => {
     const type = await setup();
-    if (cookieOnly)
-      await page.addInitScript(() => {
+    if (mode !== 'localStorage')
+      await page.addInitScript((mode) => {
         Object.defineProperty(window, 'localStorage', {
           get() {
             throw new Error('disabled');
           },
         });
-        Object.defineProperty(window, 'sessionStorage', {
-          get() {
-            throw new Error('disabled');
-          },
-        });
-      });
+        if (mode === 'cookie')
+          Object.defineProperty(window, 'sessionStorage', {
+            get() {
+              throw new Error('disabled');
+            },
+          });
+      }, mode);
     await page.goto(`/booking/${type.id}`);
     await page.getByLabel('День записи').selectOption('2026-11-05');
     await page.getByRole('list', { name: 'Свободные Слоты' }).getByRole('button').first().click();
@@ -119,20 +120,22 @@ for (const cookieOnly of [false, true])
     await page.getByRole('button', { name: 'Подтвердить запись', exact: true }).click();
     await expect(
       page.getByRole('button', { name: 'Проверить результат подтверждения' }),
-    ).toBeVisible();
-    await expect(page.getByRole('alert')).toContainText('Исход подтверждения');
+    ).toHaveCount(0);
+    await expect(page.getByRole('alert')).toContainText('Уточняем результат');
     await expect(page.getByLabel('Имя', { exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Выбрать другой Слот' })).toBeDisabled();
     const technical = (await context.cookies()).filter((c) =>
       c.name.startsWith('guest_confirmation_'),
     );
-    if (cookieOnly) {
+    if (mode === 'cookie') {
       expect(technical).toHaveLength(1);
       expect(decodeURIComponent(technical[0]!.value)).not.toContain('Private');
       expect(decodeURIComponent(technical[0]!.value)).not.toContain('Секретное');
     }
     await page.unroute('**/api/holds/*/confirm');
-    await page.reload();
+    if (mode === 'cookie') await page.reload();
+    await expect(page.getByRole('heading', { name: 'Вы записаны' })).toBeVisible();
+    await page.goto(`/booking/${type.id}`);
     await expect(page.getByRole('heading', { name: 'Вы записаны' })).toBeVisible();
     expect(posts).toBe(1);
   });
