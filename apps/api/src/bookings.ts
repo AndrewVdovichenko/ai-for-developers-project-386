@@ -189,3 +189,21 @@ export async function confirmHold(
     },
   );
 }
+
+export async function listOwnerBookings(pool: pg.Pool, rawFilter: unknown, clock?: () => Date) {
+  const values = rawFilter === undefined ? [] : Array.isArray(rawFilter) ? rawFilter : [rawFilter];
+  if (!values.every(isUuid))
+    throw new AccessError(400, 'INVALID_FILTER', 'Некорректный Тип встречи. Сбросьте фильтр.');
+  const ids = [...new Set(values.map((id: string) => id.toLowerCase()))];
+  if (ids.length) {
+    const known = await pool.query('SELECT id FROM event_types WHERE id=ANY($1::uuid[])', [ids]);
+    if (known.rowCount !== ids.length)
+      throw new AccessError(400, 'INVALID_FILTER', 'Неизвестный Тип встречи. Сбросьте фильтр.');
+  }
+  const now = await decisionTime(pool, clock);
+  const rows = await pool.query<BookingRow>(
+    `SELECT ${columns} FROM bookings b JOIN event_types t ON t.id=b.event_type_id WHERE b.ends_at>$1 ${ids.length ? 'AND b.event_type_id=ANY($2::uuid[])' : ''} ORDER BY b.starts_at,b.id`,
+    ids.length ? [now, ids] : [now],
+  );
+  return { items: rows.rows.map(present), serverNow: now.toISOString() };
+}
