@@ -390,14 +390,11 @@ export function BookingCalendar({ id }: { id: string }) {
           )}
         </Stack>
       ) : null}
-      {hold &&
-        (hold.state === 'active' || hold.state === 'expired' || hold.state === 'confirmed') && (
-          <BookingForm
-            hold={hold}
-            disabled={busy || unresolved || hold.state === 'confirmed'}
-            onLocked={setConfirmLocked}
-          />
-        )}
+      <BookingForm
+        hold={hold}
+        disabled={busy || unresolved || hold?.state === 'confirmed'}
+        onLocked={setConfirmLocked}
+      />
       {hold?.state === 'confirmed' && hold.bookingId && (
         <Button component={Link} to={`/bookings/${hold.bookingId}`}>
           Открыть Запись

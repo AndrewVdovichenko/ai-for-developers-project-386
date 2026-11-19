@@ -10,6 +10,14 @@ import {
   ownerSessionLoginOwner,
   ownerSessionLogoutOwner,
   getStatus,
+  guestSessionPrepareGuest,
+  guestSessionVerifyGuest,
+  getSlotAvailability,
+  selectHold,
+  getHold,
+  confirmHold,
+  getBooking,
+  getGuestOperation,
   createEventType,
   eventTypesListEventTypes,
   getOwnerOperation,
@@ -160,6 +168,34 @@ try {
     body: scheduleBody,
   });
   assert.equal(schedule.response!.status, 200);
+  const guestResponse = await guestSessionPrepareGuest({
+    baseUrl,
+    headers: { Origin: origin },
+    body: {},
+  });
+  const guestCookie = cookie(guestResponse.response);
+  const guestHeaders = { Origin: origin, Cookie: guestCookie };
+  const slots = (await getSlotAvailability({ baseUrl, path: { id: created.data!.eventType.id } }))
+    .data!;
+  const startsAt = slots.slots[0]!.startsAt;
+  const holdKey = randomUUID();
+  const holdBody = { eventTypeId: created.data!.eventType.id, startsAt };
+  const hold = (
+    await selectHold({
+      baseUrl,
+      headers: { ...guestHeaders, 'Idempotency-Key': holdKey },
+      body: holdBody,
+    })
+  ).data!;
+  const guestRefusalKey = randomUUID();
+  const badBody = { guestName: '', guestEmail: 'invalid' };
+  const guestRefusal = await confirmHold({
+    baseUrl,
+    headers: { ...guestHeaders, 'Idempotency-Key': guestRefusalKey },
+    path: { id: hold.hold.id },
+    body: badBody,
+  });
+  assert.equal(guestRefusal.response!.status, 400);
   for (let i = 0; i < 5; i++) assert.equal((await login('неверный')).response!.status, 401);
   baseUrl = await recreate();
   assert.deepEqual(
@@ -191,6 +227,51 @@ try {
     (await getOwnerOperation({ baseUrl, headers: typeHeaders, path: { key: refusalKey } })).data,
     { state: 'completed', response: { status: 400, body: refused.error } },
   );
+  assert.equal(
+    (await guestSessionVerifyGuest({ baseUrl, headers: guestHeaders })).data?.ready,
+    true,
+  );
+  assert.deepEqual(
+    (await getHold({ baseUrl, headers: guestHeaders, path: { id: hold.hold.id } })).data!.hold,
+    hold.hold,
+  );
+  assert.deepEqual(
+    (
+      await selectHold({
+        baseUrl,
+        headers: { ...guestHeaders, 'Idempotency-Key': holdKey },
+        body: holdBody,
+      })
+    ).data,
+    hold,
+  );
+  assert.deepEqual(
+    (await getGuestOperation({ baseUrl, headers: guestHeaders, path: { key: guestRefusalKey } }))
+      .data,
+    { state: 'completed', response: { status: 400, body: guestRefusal.error } },
+  );
+  assert.deepEqual(
+    (
+      await confirmHold({
+        baseUrl,
+        headers: { ...guestHeaders, 'Idempotency-Key': guestRefusalKey },
+        path: { id: hold.hold.id },
+        body: badBody,
+      })
+    ).error,
+    guestRefusal.error,
+  );
+  const confirmationKey = randomUUID();
+  const confirmationBody = { guestName: 'Сохранённый Гость', guestEmail: 'Guest@Example.com' };
+  const confirmation = (
+    await confirmHold({
+      baseUrl,
+      headers: { ...guestHeaders, 'Idempotency-Key': confirmationKey },
+      path: { id: hold.hold.id },
+      body: confirmationBody,
+    })
+  ).data!;
+  assert(confirmation.booking.id);
   const limited = await login(password);
   assert.equal(limited.error?.code, 'LOGIN_RATE_LIMITED');
   assert(limited.error.retryAfterSeconds! > 0 && limited.error.retryAfterSeconds! <= 900);
@@ -200,6 +281,58 @@ try {
   const replacementSession = await login(replacement);
   const replacementCookie = cookie(replacementSession.response);
   baseUrl = await recreate();
+  const recovered = (
+    await getGuestOperation({ baseUrl, headers: guestHeaders, path: { key: confirmationKey } })
+  ).data;
+  assert.deepEqual(recovered, {
+    state: 'completed',
+    response: { status: 200, body: confirmation },
+  });
+  assert.deepEqual(
+    (
+      await confirmHold({
+        baseUrl,
+        headers: { ...guestHeaders, 'Idempotency-Key': confirmationKey },
+        path: { id: hold.hold.id },
+        body: confirmationBody,
+      })
+    ).data,
+    confirmation,
+  );
+  assert.deepEqual(
+    (await getBooking({ baseUrl, headers: guestHeaders, path: { id: confirmation.booking.id } }))
+      .data!.booking,
+    confirmation.booking,
+  );
+  const confirmedHold = (
+    await getHold({ baseUrl, headers: guestHeaders, path: { id: hold.hold.id } })
+  ).data!.hold;
+  assert.equal(confirmedHold.bookingId, confirmation.booking.id);
+  assert.equal(confirmedHold.expiresAt, hold.hold.expiresAt);
+  const foreign = await guestSessionPrepareGuest({
+    baseUrl,
+    headers: { Origin: origin },
+    body: {},
+  });
+  const foreignHeaders = { Cookie: cookie(foreign.response) };
+  assert.deepEqual(
+    (await getGuestOperation({ baseUrl, headers: foreignHeaders, path: { key: confirmationKey } }))
+      .data,
+    { state: 'unknown' },
+  );
+  assert.deepEqual(
+    (await getGuestOperation({ baseUrl, headers: foreignHeaders, path: { key: randomUUID() } }))
+      .data,
+    { state: 'unknown' },
+  );
+  assert.equal(
+    (await getGuestOperation({ baseUrl, path: { key: confirmationKey } })).response!.status,
+    401,
+  );
+  assert.equal(
+    (await getBooking({ baseUrl, path: { id: confirmation.booking.id } })).response!.status,
+    404,
+  );
   assert.equal((await status(activeCookie)).data?.authenticated, false);
   assert.equal(
     (await status(replacementCookie)).data?.expiresAt,
@@ -238,7 +371,7 @@ try {
     schedule.data,
   );
   console.log(
-    'Пересоздание контейнера с тем же томом сохраняет пароль, сроки, отзыв, лимит входа, типы встреч и результаты операций.',
+    'Пересоздание контейнера с тем же томом сохраняет пароль, сроки, отзыв, лимит входа, типы встреч, Гостя, Бронирование, Запись и результаты операций.',
   );
 } finally {
   await stopApi();
