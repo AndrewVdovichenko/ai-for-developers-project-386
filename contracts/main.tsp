@@ -15,7 +15,7 @@ model Session {
 }
 model SessionStatus extends Session { configured: boolean; }
 model ApiError {
-  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED" | "GUEST_SESSION_REQUIRED" | "HOLD_UNAVAILABLE" | "SLOT_UNAVAILABLE" | "SLOT_STARTED" | "SLOT_NO_LONGER_OFFERED";
+  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED" | "GUEST_SESSION_REQUIRED" | "HOLD_UNAVAILABLE" | "SLOT_UNAVAILABLE" | "SLOT_STARTED" | "SLOT_NO_LONGER_OFFERED" | "HOLD_ALREADY_CONFIRMED";
   message: string;
   fieldErrors?: { field: string; code: string; message: string }[];
   retryAfterSeconds?: int32;
@@ -125,3 +125,5 @@ model HoldResponse { hold: Hold; serverNow: UtcInstant; }
 @route("/api/holds/current") @get op getCurrentHold(): { hold: Hold | null; serverNow: UtcInstant } | Unauthorized | Unavailable | InternalError;
 @route("/api/holds/{id}") @get op getHold(@path id: string): HoldResponse | NotFound | Unavailable | InternalError;
 @route("/api/operations/{key}") @get op getGuestOperation(@path key: string): OperationResult | BadRequest | Unauthorized | Unavailable | InternalError;
+
+@route("/api/holds/{id}/release") @post op releaseHold(@path id: string, @header("Idempotency-Key") key: string, @body body: {}): HoldResponse | BadRequest | Unauthorized | Forbidden | NotFound | Conflict | Unavailable | InternalError;

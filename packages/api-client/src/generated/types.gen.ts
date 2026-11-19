@@ -5,7 +5,7 @@ export type ClientOptions = {
 };
 
 export type ApiError = {
-    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED' | 'GUEST_SESSION_REQUIRED' | 'HOLD_UNAVAILABLE' | 'SLOT_UNAVAILABLE' | 'SLOT_STARTED' | 'SLOT_NO_LONGER_OFFERED';
+    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED' | 'GUEST_SESSION_REQUIRED' | 'HOLD_UNAVAILABLE' | 'SLOT_UNAVAILABLE' | 'SLOT_STARTED' | 'SLOT_NO_LONGER_OFFERED' | 'HOLD_ALREADY_CONFIRMED';
     message: string;
     fieldErrors?: Array<{
         field: string;
@@ -445,6 +445,62 @@ export type GetHoldResponses = {
 };
 
 export type GetHoldResponse = GetHoldResponses[keyof GetHoldResponses];
+
+export type ReleaseHoldData = {
+    body: {
+        [key: string]: unknown;
+    };
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/holds/{id}/release';
+};
+
+export type ReleaseHoldErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type ReleaseHoldError = ReleaseHoldErrors[keyof ReleaseHoldErrors];
+
+export type ReleaseHoldResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: HoldResponse;
+};
+
+export type ReleaseHoldResponse = ReleaseHoldResponses[keyof ReleaseHoldResponses];
 
 export type GetGuestOperationData = {
     body?: never;

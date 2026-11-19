@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetCurrentHoldData, GetCurrentHoldErrors, GetCurrentHoldResponses, GetGuestOperationData, GetGuestOperationErrors, GetGuestOperationResponses, GetHoldData, GetHoldErrors, GetHoldResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetSlotAvailabilityData, GetSlotAvailabilityErrors, GetSlotAvailabilityResponses, GetStatusData, GetStatusResponses, GuestSessionPrepareGuestData, GuestSessionPrepareGuestErrors, GuestSessionPrepareGuestResponses, GuestSessionVerifyGuestData, GuestSessionVerifyGuestErrors, GuestSessionVerifyGuestResponses, OwnerAvailabilityGetAvailabilityData, OwnerAvailabilityGetAvailabilityErrors, OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilitySaveAvailabilityData, OwnerAvailabilitySaveAvailabilityErrors, OwnerAvailabilitySaveAvailabilityResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses, SelectHoldData, SelectHoldErrors, SelectHoldResponses } from './types.gen.js';
+import type { CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetCurrentHoldData, GetCurrentHoldErrors, GetCurrentHoldResponses, GetGuestOperationData, GetGuestOperationErrors, GetGuestOperationResponses, GetHoldData, GetHoldErrors, GetHoldResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetSlotAvailabilityData, GetSlotAvailabilityErrors, GetSlotAvailabilityResponses, GetStatusData, GetStatusResponses, GuestSessionPrepareGuestData, GuestSessionPrepareGuestErrors, GuestSessionPrepareGuestResponses, GuestSessionVerifyGuestData, GuestSessionVerifyGuestErrors, GuestSessionVerifyGuestResponses, OwnerAvailabilityGetAvailabilityData, OwnerAvailabilityGetAvailabilityErrors, OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilitySaveAvailabilityData, OwnerAvailabilitySaveAvailabilityErrors, OwnerAvailabilitySaveAvailabilityResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses, ReleaseHoldData, ReleaseHoldErrors, ReleaseHoldResponses, SelectHoldData, SelectHoldErrors, SelectHoldResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -49,6 +49,15 @@ export const selectHold = <ThrowOnError extends boolean = false>(options: Option
 export const getCurrentHold = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentHoldData, ThrowOnError>): RequestResult<GetCurrentHoldResponses, GetCurrentHoldErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentHoldResponses, GetCurrentHoldErrors, ThrowOnError>({ url: '/api/holds/current', ...options });
 
 export const getHold = <ThrowOnError extends boolean = false>(options: Options<GetHoldData, ThrowOnError>): RequestResult<GetHoldResponses, GetHoldErrors, ThrowOnError> => (options.client ?? client).get<GetHoldResponses, GetHoldErrors, ThrowOnError>({ url: '/api/holds/{id}', ...options });
+
+export const releaseHold = <ThrowOnError extends boolean = false>(options: Options<ReleaseHoldData, ThrowOnError>): RequestResult<ReleaseHoldResponses, ReleaseHoldErrors, ThrowOnError> => (options.client ?? client).post<ReleaseHoldResponses, ReleaseHoldErrors, ThrowOnError>({
+    url: '/api/holds/{id}/release',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const getGuestOperation = <ThrowOnError extends boolean = false>(options: Options<GetGuestOperationData, ThrowOnError>): RequestResult<GetGuestOperationResponses, GetGuestOperationErrors, ThrowOnError> => (options.client ?? client).get<GetGuestOperationResponses, GetGuestOperationErrors, ThrowOnError>({ url: '/api/operations/{key}', ...options });
 

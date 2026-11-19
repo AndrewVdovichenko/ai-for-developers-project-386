@@ -186,3 +186,114 @@ for (const fallback of ['session', 'cookie'] as const) {
     await expect(page.getByText('Слот выбран', { exact: true })).toBeVisible();
   });
 }
+
+test('возврат к выбору сохраняет Бронирование; две вкладки видят замену и освобождение', async ({
+  context,
+  page,
+}) => {
+  const type = await setup();
+  await open(page, type.id);
+  await page.getByRole('list', { name: 'Свободные Слоты' }).getByRole('button').first().click();
+  const oldNumber = await page.getByText(/Номер Бронирования:/).textContent();
+  const second = await context.newPage();
+  await second.goto(`http://127.0.0.1:4174/booking/${type.id}`);
+  await expect(second.getByText(oldNumber!, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Выбрать другой Слот' }).click();
+  await expect(page.getByText(oldNumber!, { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'В каталог' }).click();
+  await page.goBack();
+  await expect(page.getByText(oldNumber!, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Выбрать другой Слот' }).click();
+  await page.getByLabel('День записи').selectOption('2026-10-31');
+  await page.getByRole('list', { name: 'Свободные Слоты' }).getByRole('button').first().click();
+  await expect(page.getByText(/Номер Бронирования:/)).not.toHaveText(oldNumber!);
+  const newNumber = await page.getByText(/Номер Бронирования:/).textContent();
+  expect(newNumber).not.toBe(oldNumber);
+  await second.bringToFront();
+  await second.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(second.getByText(newNumber!, { exact: true })).toBeVisible();
+  await expect(second.getByRole('alert')).toContainText('Выбор изменён в');
+  await second.getByRole('button', { name: 'Освободить Бронирование' }).click();
+  await expect(second.getByText('Бронирование освобождено', { exact: true })).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText('Бронирование освобождено', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Бронирование освобождено', { exact: true })).toBeVisible();
+});
+
+for (const committed of [true, false]) {
+  test(`неизвестное освобождение сохраняет выбор до восстановления: commit ${committed}`, async ({
+    page,
+  }) => {
+    const type = await setup();
+    await open(page, type.id);
+    await page.getByRole('list', { name: 'Свободные Слоты' }).getByRole('button').first().click();
+    const number = await page.getByText(/Номер Бронирования:/).textContent();
+    await page.route('**/api/holds/*/release', async (route) => {
+      if (committed) await route.fetch();
+      await route.abort();
+    });
+    await page.getByRole('button', { name: 'Освободить Бронирование' }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByText(number!, { exact: true })).toBeVisible();
+    await expect(page.getByText('Бронирование освобождено', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Проверить результат выбора' })).toBeVisible();
+    await page.unroute('**/api/holds/*/release');
+    await page.reload();
+    await expect(page.getByText('Бронирование освобождено', { exact: true })).toBeVisible();
+  });
+}
+
+test('задержавшееся чтение прежнего выбора не отменяет успешную замену', async ({ page }) => {
+  const type = await setup();
+  await open(page, type.id);
+  await page.getByRole('list', { name: 'Свободные Слоты' }).getByRole('button').first().click();
+  const old = await page.getByText(/Номер Бронирования:/).textContent();
+  await page.getByRole('button', { name: 'Выбрать другой Слот' }).click();
+  await page.getByLabel('День записи').selectOption('2026-10-31');
+  let resume!: () => void, captured!: () => void, finished!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    resume = resolve;
+  });
+  const ready = new Promise<void>((resolve) => {
+    captured = resolve;
+  });
+  const done = new Promise<void>((resolve) => {
+    finished = resolve;
+  });
+  let first = true;
+  await page.route('**/api/holds/current', async (route) => {
+    if (!first) {
+      await route.continue();
+      return;
+    }
+    first = false;
+    const response = await route.fetch();
+    captured();
+    await delayed;
+    await route.fulfill({ response });
+    finished();
+  });
+  try {
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await ready;
+    await page.getByRole('list', { name: 'Свободные Слоты' }).getByRole('button').first().click();
+    await expect(page.getByText(/Номер Бронирования:/)).not.toHaveText(old!);
+    const next = await page.getByText(/Номер Бронирования:/).textContent();
+    const received = page.waitForResponse('**/api/holds/current');
+    resume();
+    await done;
+    await received;
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    // A visible stable value after the delayed response, with no second mutation.
+    await expect(page.getByText(next!, { exact: true })).toBeVisible();
+    await expect(page.getByText(old!, { exact: true })).toHaveCount(0);
+  } finally {
+    resume();
+  }
+});
