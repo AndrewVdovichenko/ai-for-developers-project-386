@@ -4,6 +4,18 @@ export type ClientOptions = {
     baseUrl: 'http://127.0.0.1:3000' | (string & {});
 };
 
+export type AffectedHold = AffectedInterval & {
+    expiresAt: string;
+};
+
+export type AffectedInterval = {
+    id: string;
+    eventTypeId: string;
+    eventTypeName: string;
+    startsAt: string;
+    endsAt: string;
+};
+
 export type ApiError = {
     code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED' | 'GUEST_SESSION_REQUIRED' | 'HOLD_UNAVAILABLE' | 'SLOT_UNAVAILABLE' | 'SLOT_STARTED' | 'SLOT_NO_LONGER_OFFERED' | 'HOLD_ALREADY_CONFIRMED' | 'HOLD_REPLACED' | 'HOLD_RELEASED' | 'BOOKING_UNAVAILABLE' | 'INVALID_FILTER';
     message: string;
@@ -13,6 +25,14 @@ export type ApiError = {
         message: string;
     }>;
     retryAfterSeconds?: number;
+};
+
+export type AvailabilityPreview = {
+    confirmationToken: string;
+    expiresAt: string;
+    serverNow: string;
+    affectedBookings: Array<AffectedInterval>;
+    affectedHolds: Array<AffectedHold>;
 };
 
 export type AvailabilityResponse = {
@@ -110,6 +130,12 @@ export type OperationResult = {
 export type OwnerBookings = {
     items: Array<Booking>;
     serverNow: UtcInstant;
+};
+
+export type PreviewAvailability = {
+    revision: number;
+    timeZone: string;
+    days: Array<WeeklyDay>;
 };
 
 export type SaveAvailability = {
@@ -742,6 +768,51 @@ export type OwnerAvailabilitySaveAvailabilityResponses = {
 };
 
 export type OwnerAvailabilitySaveAvailabilityResponse = OwnerAvailabilitySaveAvailabilityResponses[keyof OwnerAvailabilitySaveAvailabilityResponses];
+
+export type OwnerAvailabilityPreviewAvailabilityData = {
+    body: PreviewAvailability;
+    path?: never;
+    query?: never;
+    url: '/api/owner/availability/preview';
+};
+
+export type OwnerAvailabilityPreviewAvailabilityErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerAvailabilityPreviewAvailabilityError = OwnerAvailabilityPreviewAvailabilityErrors[keyof OwnerAvailabilityPreviewAvailabilityErrors];
+
+export type OwnerAvailabilityPreviewAvailabilityResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: AvailabilityPreview;
+};
+
+export type OwnerAvailabilityPreviewAvailabilityResponse = OwnerAvailabilityPreviewAvailabilityResponses[keyof OwnerAvailabilityPreviewAvailabilityResponses];
 
 export type ListOwnerBookingsData = {
     body?: never;

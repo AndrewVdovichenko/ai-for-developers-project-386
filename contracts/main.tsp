@@ -86,8 +86,13 @@ model SaveAvailability {
   @doc("Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.") days: WeeklyDay[];
   confirmationToken?: string;
 }
+model PreviewAvailability { revision: int32; timeZone: string; days: WeeklyDay[]; }
+model AffectedInterval { id: string; eventTypeId: string; eventTypeName: string; startsAt: string; endsAt: string; }
+model AffectedHold extends AffectedInterval { expiresAt: string; }
+model AvailabilityPreview { confirmationToken: string; expiresAt: string; serverNow: string; affectedBookings: AffectedInterval[]; affectedHolds: AffectedHold[]; }
 @route("/api/owner/availability")
 namespace OwnerAvailability {
+  @route("/preview") @post op previewAvailability(@body body: PreviewAvailability): AvailabilityPreview | BadRequest | Unauthorized | Forbidden | Conflict | Unavailable | InternalError;
   @get op getAvailability(): AvailabilityResponse | Unauthorized | Unavailable | InternalError;
   @put op saveAvailability(@header("Idempotency-Key") key: string, @body body: SaveAvailability): AvailabilityResponse | BadRequest | Unauthorized | Forbidden | Conflict | Unavailable | InternalError;
 }

@@ -6,7 +6,7 @@ import { getSlotAvailability } from './slots.js';
 import pg from 'pg';
 import { createEventType, getEventType, listEventTypes } from './event-types.js';
 import { ownerSubject, readOperation } from './operations.js';
-import { getAvailability, saveAvailability } from './availability.js';
+import { getAvailability, saveAvailability, previewAvailability } from './availability.js';
 import { checkSchema } from './migrations.js';
 import { AccessError, login, logout, session } from './access.js';
 
@@ -212,11 +212,15 @@ export function createApp(options: {
   );
   app.get('/api/event-types', () => listEventTypes(options.pool));
   app.get('/api/owner/availability', () => getAvailability(options.pool));
+  app.post('/api/owner/availability/preview', (request) =>
+    previewAvailability(options.pool, request.body, options.decisionNow),
+  );
   app.put('/api/owner/availability', async (request, reply) => {
     const result = await saveAvailability(
       options.pool,
       request.headers['idempotency-key'],
       request.body,
+      options.decisionNow,
     );
     return reply.code(result.status).send(result.body);
   });
