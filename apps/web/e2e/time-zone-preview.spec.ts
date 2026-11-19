@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   ownerAvailabilityGetAvailability,
   ownerAvailabilitySaveAvailability,
+  ownerAvailabilityPreviewAvailability,
 } from '@calendar/api-client';
 
 test('предложение пояса можно отклонить; ручная смена требует просмотра и явного подтверждения', async ({
@@ -25,11 +26,16 @@ test('предложение пояса можно отклонить; ручн�
       },
     };
     const initial = (await ownerAvailabilityGetAvailability(initialOptions)).data!.availability;
-    if (!initial.configured) {
+    if (!initial.configured || initial.timeZone === 'Pacific/Honolulu') {
+      const body = { revision: initial.revision, timeZone: 'Europe/Berlin', days: initial.days };
+      const confirmationToken = initial.configured
+        ? (await ownerAvailabilityPreviewAvailability({ ...initialOptions, body })).data!
+            .confirmationToken
+        : undefined;
       await ownerAvailabilitySaveAvailability({
         ...initialOptions,
         headers: { ...initialOptions.headers, 'Idempotency-Key': crypto.randomUUID() },
-        body: { revision: initial.revision, timeZone: 'Europe/Berlin', days: initial.days },
+        body: { ...body, ...(confirmationToken ? { confirmationToken } : {}) },
       });
       await page.reload();
     }
@@ -215,5 +221,42 @@ test('последствия требуют повторного просмот�
       data: { instant: '2026-10-24T22:00:00.000Z' },
     });
     await Promise.all([owner.close(), active.close(), expired.close()]);
+  }
+});
+
+test('конфликт revision сохраняет предложенный пояс в черновике до нового просмотра', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/owner/availability');
+  await page
+    .getByRole('textbox', { name: 'Пароль', exact: true })
+    .fill('тестовый пароль Владельца');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await expect(page.getByLabel('Часовой пояс календаря', { exact: true })).toBeVisible();
+  const other = await context.newPage();
+  try {
+    await other.goto('/owner/availability');
+    await expect(other.getByLabel('Понедельник: начало 1', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Изменить пояс вручную' }).click();
+    await page.getByLabel('Часовой пояс календаря', { exact: true }).fill('Europe/London');
+    await other.getByLabel('Понедельник: начало 1', { exact: true }).fill('08:00');
+    await other.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+    await expect(other.getByRole('status')).toContainText('Расписание сохранено');
+    await page.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Расписание изменилось');
+    await expect(page.getByLabel('Часовой пояс календаря', { exact: true })).toHaveValue(
+      'Europe/London',
+    );
+    await page.getByRole('button', { name: 'Оставить черновик поверх актуальной версии' }).click();
+    await expect(page.getByLabel('Часовой пояс календаря', { exact: true })).toHaveValue(
+      'Europe/London',
+    );
+    await page.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
+    await expect(page.getByRole('dialog')).toContainText('Новый пояс календаря: Europe/London');
+    await page.getByRole('button', { name: 'Подтвердить смену пояса', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Расписание сохранено');
+  } finally {
+    await other.close();
   }
 });

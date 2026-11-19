@@ -546,7 +546,6 @@ export function OwnerAvailability() {
                     change({
                       ...draft,
                       revision: current.revision,
-                      timeZone: current.timeZone ?? draft.timeZone,
                     });
                     setConflict(false);
                     setError('');
