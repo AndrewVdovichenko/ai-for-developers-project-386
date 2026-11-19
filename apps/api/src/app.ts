@@ -1,8 +1,12 @@
+import { confirmHold, readBooking, listOwnerBookings } from './bookings.js';
+import { guest, guestSecret, prepareGuest, requireGuest } from './guests.js';
+import { guestSubject, readHold, selectHold, releaseHold } from './holds.js';
 import Fastify from 'fastify';
+import { getSlotAvailability } from './slots.js';
 import pg from 'pg';
 import { createEventType, getEventType, listEventTypes } from './event-types.js';
 import { ownerSubject, readOperation } from './operations.js';
-import { getAvailability, saveAvailability } from './availability.js';
+import { getAvailability, saveAvailability, previewAvailability } from './availability.js';
 import { checkSchema } from './migrations.js';
 import { AccessError, login, logout, session } from './access.js';
 
@@ -11,6 +15,7 @@ export function createApp(options: {
   origin: string;
   now?: () => Date;
   trustProxy?: string[];
+  decisionNow?: () => Date;
 }) {
   const now = options.now ?? (() => new Date());
   const origin = new URL(options.origin);
@@ -114,13 +119,108 @@ export function createApp(options: {
     await logout(options.pool, secretFrom(request.headers.cookie));
     return reply.header('Set-Cookie', cookie('', 0)).code(204).send();
   });
+  const guestId = (header?: string) => guest(options.pool, guestSecret(header, secure), now());
+  app.get('/api/guest-session', async (request) => ({
+    ready: !!(await guestId(request.headers.cookie)),
+  }));
+  app.post('/api/guest-session', async (request, reply) => {
+    if (
+      !request.body ||
+      typeof request.body !== 'object' ||
+      Array.isArray(request.body) ||
+      Object.keys(request.body).length
+    )
+      throw new AccessError(400, 'INVALID_REQUEST', 'Требуется пустой объект');
+    const secret = await prepareGuest(
+      options.pool,
+      guestSecret(request.headers.cookie, secure),
+      now(),
+    );
+    if (secret)
+      reply.header(
+        'Set-Cookie',
+        `${secure ? '__Host-guest_session' : 'guest_session'}=${secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure ? '; Secure' : ''}`,
+      );
+    return { ready: true };
+  });
+  app.post('/api/holds', async (request, reply) => {
+    const result = await selectHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      request.headers['idempotency-key'],
+      request.body,
+      options.decisionNow,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.post<{ Params: { id: string } }>('/api/holds/:id/release', async (request, reply) => {
+    const result = await releaseHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      request.params.id,
+      request.headers['idempotency-key'],
+      request.body,
+      options.decisionNow,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.post<{ Params: { id: string } }>('/api/holds/:id/confirm', async (request, reply) => {
+    const result = await confirmHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      request.params.id,
+      request.headers['idempotency-key'],
+      request.body,
+      options.decisionNow,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.get<{ Params: { id: string } }>('/api/bookings/:id', async (request) =>
+    readBooking(
+      options.pool,
+      request.params.id,
+      await guestId(request.headers.cookie),
+      (await session(options.pool, secretFrom(request.headers.cookie), now)).authenticated,
+      options.decisionNow,
+    ),
+  );
+  app.get('/api/holds/current', async (request) =>
+    readHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      undefined,
+      options.decisionNow,
+    ),
+  );
+  app.get<{ Params: { id: string } }>('/api/holds/:id', async (request) =>
+    readHold(
+      options.pool,
+      await guestId(request.headers.cookie),
+      request.params.id,
+      options.decisionNow,
+    ),
+  );
+  app.get<{ Params: { key: string } }>('/api/operations/:key', async (request) =>
+    readOperation(
+      options.pool,
+      guestSubject(requireGuest(await guestId(request.headers.cookie))),
+      request.params.key,
+    ),
+  );
+  app.get<{ Querystring: { eventTypeId?: unknown } }>('/api/owner/bookings', (request) =>
+    listOwnerBookings(options.pool, request.query.eventTypeId, options.decisionNow),
+  );
   app.get('/api/event-types', () => listEventTypes(options.pool));
   app.get('/api/owner/availability', () => getAvailability(options.pool));
+  app.post('/api/owner/availability/preview', (request) =>
+    previewAvailability(options.pool, request.body, options.decisionNow),
+  );
   app.put('/api/owner/availability', async (request, reply) => {
     const result = await saveAvailability(
       options.pool,
       request.headers['idempotency-key'],
       request.body,
+      options.decisionNow,
     );
     return reply.code(result.status).send(result.body);
   });
@@ -131,6 +231,16 @@ export function createApp(options: {
       reply.code(404).send({ code: 'EVENT_TYPE_NOT_FOUND', message: 'Тип встречи не найден' })
     );
   });
+  app.get<{ Params: { id: string } }>(
+    '/api/event-types/:id/availability',
+    async (request, reply) => {
+      const result = await getSlotAvailability(options.pool, request.params.id, now);
+      return (
+        result ??
+        reply.code(404).send({ code: 'EVENT_TYPE_NOT_FOUND', message: 'Тип встречи не найден' })
+      );
+    },
+  );
   app.post('/api/owner/event-types', async (request, reply) => {
     const result = await createEventType(
       options.pool,

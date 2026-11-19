@@ -4,8 +4,20 @@ export type ClientOptions = {
     baseUrl: 'http://127.0.0.1:3000' | (string & {});
 };
 
+export type AffectedHold = AffectedInterval & {
+    expiresAt: string;
+};
+
+export type AffectedInterval = {
+    id: string;
+    eventTypeId: string;
+    eventTypeName: string;
+    startsAt: string;
+    endsAt: string;
+};
+
 export type ApiError = {
-    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED';
+    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED' | 'GUEST_SESSION_REQUIRED' | 'HOLD_UNAVAILABLE' | 'SLOT_UNAVAILABLE' | 'SLOT_STARTED' | 'SLOT_NO_LONGER_OFFERED' | 'HOLD_ALREADY_CONFIRMED' | 'HOLD_REPLACED' | 'HOLD_RELEASED' | 'BOOKING_UNAVAILABLE' | 'INVALID_FILTER';
     message: string;
     fieldErrors?: Array<{
         field: string;
@@ -13,6 +25,14 @@ export type ApiError = {
         message: string;
     }>;
     retryAfterSeconds?: number;
+};
+
+export type AvailabilityPreview = {
+    confirmationToken: string;
+    expiresAt: string;
+    serverNow: string;
+    affectedBookings: Array<AffectedInterval>;
+    affectedHolds: Array<AffectedHold>;
 };
 
 export type AvailabilityResponse = {
@@ -28,6 +48,33 @@ export type AvailabilitySettings = {
      * Ровно семь неповторяющихся дней: понедельник 1 — воскресенье 7.
      */
     days: Array<WeeklyDay>;
+};
+
+export type Booking = {
+    id: string;
+    holdId: string;
+    eventTypeId: string;
+    eventTypeName: string;
+    startsAt: UtcInstant;
+    endsAt: UtcInstant;
+    guestName: string;
+    guestEmail: string;
+};
+
+export type BookingResponse = {
+    booking: Booking;
+    serverNow: UtcInstant;
+};
+
+export type ConfirmBooking = {
+    /**
+     * Обязательное имя: 1–100 кодовых точек после trim.
+     */
+    guestName: string;
+    /**
+     * До 254 кодовых точек после trim; регистр сохраняется, формат ^[^\s@]+@[^\s@]+\.[^\s@]+$ с флагом u.
+     */
+    guestEmail: string;
 };
 
 export type CreateEventType = {
@@ -53,9 +100,24 @@ export type EventTypeCreated = {
     eventType: EventType;
 };
 
+export type Hold = {
+    id: string;
+    eventTypeId: string;
+    startsAt: UtcInstant;
+    endsAt: UtcInstant;
+    expiresAt: UtcInstant;
+    state: 'active' | 'expired' | 'released' | 'replaced' | 'confirmed';
+    bookingId: string | null;
+};
+
+export type HoldResponse = {
+    hold: Hold;
+    serverNow: UtcInstant;
+};
+
 export type OperationResponse = {
     status: number;
-    body: EventTypeCreated | AvailabilityResponse | ApiError;
+    body: EventTypeCreated | AvailabilityResponse | HoldResponse | BookingResponse | ApiError;
 };
 
 export type OperationResult = {
@@ -63,6 +125,17 @@ export type OperationResult = {
 } | {
     state: 'completed';
     response: OperationResponse;
+};
+
+export type OwnerBookings = {
+    items: Array<Booking>;
+    serverNow: UtcInstant;
+};
+
+export type PreviewAvailability = {
+    revision: number;
+    timeZone: string;
+    days: Array<WeeklyDay>;
 };
 
 export type SaveAvailability = {
@@ -84,6 +157,25 @@ export type Session = {
 export type SessionStatus = Session & {
     configured: boolean;
 };
+
+export type Slot = {
+    startsAt: UtcInstant;
+    endsAt: UtcInstant;
+};
+
+export type SlotAvailability = {
+    configured: boolean;
+    serverNow: UtcInstant;
+    timeZone: string | null;
+    windowStartsAt: UtcInstant | null;
+    windowEndsAt: UtcInstant | null;
+    slots: Array<Slot>;
+};
+
+/**
+ * Concrete UTC instants always include milliseconds and Z.
+ */
+export type UtcInstant = string;
 
 export type WeeklyDay = {
     weekday: number;
@@ -112,6 +204,41 @@ export type GetStatusResponses = {
 };
 
 export type GetStatusResponse = GetStatusResponses[keyof GetStatusResponses];
+
+export type GetBookingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/bookings/{id}';
+};
+
+export type GetBookingErrors = {
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetBookingError = GetBookingErrors[keyof GetBookingErrors];
+
+export type GetBookingResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: BookingResponse;
+};
+
+export type GetBookingResponse = GetBookingResponses[keyof GetBookingResponses];
 
 export type EventTypesListEventTypesData = {
     body?: never;
@@ -178,6 +305,388 @@ export type EventTypesGetEventTypeResponses = {
 };
 
 export type EventTypesGetEventTypeResponse = EventTypesGetEventTypeResponses[keyof EventTypesGetEventTypeResponses];
+
+export type GetSlotAvailabilityData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/event-types/{id}/availability';
+};
+
+export type GetSlotAvailabilityErrors = {
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetSlotAvailabilityError = GetSlotAvailabilityErrors[keyof GetSlotAvailabilityErrors];
+
+export type GetSlotAvailabilityResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: SlotAvailability;
+};
+
+export type GetSlotAvailabilityResponse = GetSlotAvailabilityResponses[keyof GetSlotAvailabilityResponses];
+
+export type GuestSessionVerifyGuestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/guest-session';
+};
+
+export type GuestSessionVerifyGuestErrors = {
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GuestSessionVerifyGuestError = GuestSessionVerifyGuestErrors[keyof GuestSessionVerifyGuestErrors];
+
+export type GuestSessionVerifyGuestResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: {
+        ready: boolean;
+    };
+};
+
+export type GuestSessionVerifyGuestResponse = GuestSessionVerifyGuestResponses[keyof GuestSessionVerifyGuestResponses];
+
+export type GuestSessionPrepareGuestData = {
+    body: {
+        [key: string]: unknown;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/guest-session';
+};
+
+export type GuestSessionPrepareGuestErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GuestSessionPrepareGuestError = GuestSessionPrepareGuestErrors[keyof GuestSessionPrepareGuestErrors];
+
+export type GuestSessionPrepareGuestResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: {
+        ready: boolean;
+    };
+};
+
+export type GuestSessionPrepareGuestResponse = GuestSessionPrepareGuestResponses[keyof GuestSessionPrepareGuestResponses];
+
+export type SelectHoldData = {
+    body: {
+        eventTypeId: string;
+        startsAt: UtcInstant;
+    };
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/holds';
+};
+
+export type SelectHoldErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type SelectHoldError = SelectHoldErrors[keyof SelectHoldErrors];
+
+export type SelectHoldResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: HoldResponse;
+};
+
+export type SelectHoldResponse = SelectHoldResponses[keyof SelectHoldResponses];
+
+export type GetCurrentHoldData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/holds/current';
+};
+
+export type GetCurrentHoldErrors = {
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetCurrentHoldError = GetCurrentHoldErrors[keyof GetCurrentHoldErrors];
+
+export type GetCurrentHoldResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: {
+        hold: Hold | null;
+        serverNow: UtcInstant;
+    };
+};
+
+export type GetCurrentHoldResponse = GetCurrentHoldResponses[keyof GetCurrentHoldResponses];
+
+export type GetHoldData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/holds/{id}';
+};
+
+export type GetHoldErrors = {
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetHoldError = GetHoldErrors[keyof GetHoldErrors];
+
+export type GetHoldResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: HoldResponse;
+};
+
+export type GetHoldResponse = GetHoldResponses[keyof GetHoldResponses];
+
+export type ConfirmHoldData = {
+    body: ConfirmBooking;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/holds/{id}/confirm';
+};
+
+export type ConfirmHoldErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type ConfirmHoldError = ConfirmHoldErrors[keyof ConfirmHoldErrors];
+
+export type ConfirmHoldResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: BookingResponse;
+};
+
+export type ConfirmHoldResponse = ConfirmHoldResponses[keyof ConfirmHoldResponses];
+
+export type ReleaseHoldData = {
+    body: {
+        [key: string]: unknown;
+    };
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/holds/{id}/release';
+};
+
+export type ReleaseHoldErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type ReleaseHoldError = ReleaseHoldErrors[keyof ReleaseHoldErrors];
+
+export type ReleaseHoldResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: HoldResponse;
+};
+
+export type ReleaseHoldResponse = ReleaseHoldResponses[keyof ReleaseHoldResponses];
+
+export type GetGuestOperationData = {
+    body?: never;
+    path: {
+        key: string;
+    };
+    query?: never;
+    url: '/api/operations/{key}';
+};
+
+export type GetGuestOperationErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetGuestOperationError = GetGuestOperationErrors[keyof GetGuestOperationErrors];
+
+export type GetGuestOperationResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: OperationResult;
+};
+
+export type GetGuestOperationResponse = GetGuestOperationResponses[keyof GetGuestOperationResponses];
 
 export type OwnerAvailabilityGetAvailabilityData = {
     body?: never;
@@ -259,6 +768,90 @@ export type OwnerAvailabilitySaveAvailabilityResponses = {
 };
 
 export type OwnerAvailabilitySaveAvailabilityResponse = OwnerAvailabilitySaveAvailabilityResponses[keyof OwnerAvailabilitySaveAvailabilityResponses];
+
+export type OwnerAvailabilityPreviewAvailabilityData = {
+    body: PreviewAvailability;
+    path?: never;
+    query?: never;
+    url: '/api/owner/availability/preview';
+};
+
+export type OwnerAvailabilityPreviewAvailabilityErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Access is forbidden.
+     */
+    403: ApiError;
+    /**
+     * The request conflicts with the current state of the server.
+     */
+    409: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type OwnerAvailabilityPreviewAvailabilityError = OwnerAvailabilityPreviewAvailabilityErrors[keyof OwnerAvailabilityPreviewAvailabilityErrors];
+
+export type OwnerAvailabilityPreviewAvailabilityResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: AvailabilityPreview;
+};
+
+export type OwnerAvailabilityPreviewAvailabilityResponse = OwnerAvailabilityPreviewAvailabilityResponses[keyof OwnerAvailabilityPreviewAvailabilityResponses];
+
+export type ListOwnerBookingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        eventTypeId?: Array<string>;
+    };
+    url: '/api/owner/bookings';
+};
+
+export type ListOwnerBookingsErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type ListOwnerBookingsError = ListOwnerBookingsErrors[keyof ListOwnerBookingsErrors];
+
+export type ListOwnerBookingsResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: OwnerBookings;
+};
+
+export type ListOwnerBookingsResponse = ListOwnerBookingsResponses[keyof ListOwnerBookingsResponses];
 
 export type CreateEventTypeData = {
     body: CreateEventType;

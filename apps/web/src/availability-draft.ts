@@ -4,12 +4,18 @@ export type SaveContext = {
   key: string;
   fingerprint: string;
   revision: number;
+  confirmationToken?: string;
   parameters?: SaveAvailability;
 };
 export const saveStorage = operationStorage<SaveContext>(
   'owner-availability-operation',
   'owner_availability_operation',
-  ({ key, fingerprint, revision }) => ({ key, fingerprint, revision }),
+  ({ key, fingerprint, revision, confirmationToken }) => ({
+    key,
+    fingerprint,
+    revision,
+    confirmationToken,
+  }),
 );
 export type Draft = {
   revision: number;

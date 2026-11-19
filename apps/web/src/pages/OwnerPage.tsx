@@ -1,6 +1,7 @@
 import { Alert, Button, Container, Group, Loader, Stack, Title, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { OwnerBookings } from './OwnerBookings';
 import { OwnerEventTypes } from './OwnerEventTypes';
 import { OwnerAvailability } from './OwnerAvailability';
 import { readSession, signOut } from '../owner-api';
@@ -75,9 +76,7 @@ export function OwnerPage() {
             </Group>
             {location.pathname === '/owner/event-types' && <OwnerEventTypes />}
             {location.pathname === '/owner/availability' && <OwnerAvailability />}
-            {location.pathname === '/owner/bookings' && (
-              <Text>Управление этим разделом появится на&nbsp;следующих этапах.</Text>
-            )}
+            {location.pathname === '/owner/bookings' && <OwnerBookings />}
             <Button
               loading={pending}
               onClick={() => {

@@ -4,6 +4,7 @@ import {
   Checkbox,
   Group,
   Loader,
+  Modal,
   Paper,
   Stack,
   Text,
@@ -14,10 +15,16 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type {
   AvailabilitySettings,
+  AvailabilityPreview,
   OperationResponse,
   SaveAvailability,
 } from '@calendar/api-client';
-import { readAvailability, readSave, sendAvailability } from '../availability-api';
+import {
+  readAvailability,
+  readSave,
+  sendAvailability,
+  previewAvailability,
+} from '../availability-api';
 import {
   availabilityDraft,
   draftFrom,
@@ -38,6 +45,18 @@ export function OwnerAvailability() {
       (context?.parameters ? draftFrom({ ...context.parameters, configured: true }) : undefined),
   );
   const [current, setCurrent] = useState<AvailabilitySettings>();
+  const [preview, setPreview] = useState<AvailabilityPreview>();
+  const [zoneEditing, setZoneEditing] = useState(false);
+  const [suppressed, setSuppressed] = useState<string[]>(() => {
+    try {
+      const value: unknown = JSON.parse(localStorage.getItem('calendar-zone-proposal') ?? '[]');
+      return Array.isArray(value)
+        ? value.filter((pair): pair is string => typeof pair === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [selected, setSelected] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -49,6 +68,7 @@ export function OwnerAvailability() {
     void navigate('/owner/login?returnTo=%2Fowner%2Favailability');
   }
   function change(next: Draft) {
+    setPreview(undefined);
     availabilityDraft.current = next;
     setDraft(next);
     setMessage('');
@@ -86,6 +106,7 @@ export function OwnerAvailability() {
   async function finish(response: OperationResponse) {
     if (!('availability' in response.body) && !('code' in response.body))
       throw new Error('Неожиданный результат операции');
+    setPreview(undefined);
     saveStorage.clear();
     setContext(undefined);
     if ('availability' in response.body) {
@@ -95,6 +116,7 @@ export function OwnerAvailability() {
       setMessage('Расписание сохранено');
       setError('');
       setConflict(false);
+      setZoneEditing(false);
     } else {
       setError(
         [
@@ -182,10 +204,35 @@ export function OwnerAvailability() {
       setPending(false);
     }
   }
-  async function submit() {
+  async function submit(confirmationToken?: string) {
     if (!draft || conflict) return;
     await run(async () => {
       const parameters = parametersFrom(draft);
+      if (confirmationToken) parameters.confirmationToken = confirmationToken;
+      if (context?.confirmationToken) parameters.confirmationToken = context.confirmationToken;
+      if (
+        !context &&
+        current?.configured &&
+        current.timeZone !== parameters.timeZone &&
+        !confirmationToken
+      ) {
+        const result = await previewAvailability(parameters);
+        if (result.response?.status === 401) {
+          requireLogin();
+          return;
+        }
+        if (!result.data) {
+          if (result.error?.code === 'REVISION_CONFLICT') {
+            setConflict(true);
+            await refresh();
+          }
+          throw new Error(
+            result.error?.message ?? 'Не удалось получить просмотр последствий. Повторите попытку.',
+          );
+        }
+        setPreview(result.data);
+        return;
+      }
       if (!parameters.timeZone) throw new Error('Выберите IANA-пояс календаря');
       const fingerprint = await saveFingerprint(parameters);
       if (context && context.fingerprint !== fingerprint)
@@ -196,6 +243,9 @@ export function OwnerAvailability() {
         key: context?.key ?? crypto.randomUUID(),
         fingerprint,
         revision: parameters.revision,
+        ...(parameters.confirmationToken
+          ? { confirmationToken: parameters.confirmationToken }
+          : {}),
         parameters,
       };
       if (!saveStorage.persist(operation))
@@ -209,8 +259,60 @@ export function OwnerAvailability() {
   }
   const locked = pending || !!context?.parameters;
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const zonePair = `${current?.timeZone}|${browserZone}`;
+  function suppressProposal() {
+    const pairs = [...suppressed, zonePair];
+    setSuppressed(pairs);
+    try {
+      localStorage.setItem('calendar-zone-proposal', JSON.stringify(pairs));
+    } catch {
+      /* The current tab still remembers the refusal. */
+    }
+  }
   return (
     <Stack>
+      <Modal
+        opened={!!preview}
+        onClose={() => setPreview(undefined)}
+        title="Последствия смены пояса"
+        closeOnClickOutside={!pending}
+        closeOnEscape={!pending}
+        withCloseButton={!pending}
+      >
+        {preview && draft && (
+          <Stack>
+            <Text>Новый пояс календаря: {draft.timeZone}</Text>
+            <Text>
+              Местные рабочие часы сохраняются. UTC-моменты существующих Записей и Бронирований
+              остаются прежними.
+            </Text>
+            {draft.days.map((day) => (
+              <Text key={day.weekday}>
+                {names[day.weekday - 1]}:{' '}
+                {day.intervals.map((i) => `${i.start}–${i.end}`).join(', ') || 'выходной'}
+              </Text>
+            ))}
+            <Text>Затронутые Записи: {preview.affectedBookings.length}</Text>
+            {preview.affectedBookings.map((item) => (
+              <Text key={item.id}>
+                {item.eventTypeName}: {item.startsAt} — {item.endsAt}
+              </Text>
+            ))}
+            <Text>Действующие Бронирования: {preview.affectedHolds.length}</Text>
+            {preview.affectedHolds.map((item) => (
+              <Text key={item.id}>
+                {item.eventTypeName}: {item.startsAt} — {item.endsAt}; действует до {item.expiresAt}
+              </Text>
+            ))}
+            <Button disabled={pending} onClick={() => void submit(preview.confirmationToken)}>
+              Подтвердить смену пояса
+            </Button>
+            <Button disabled={pending} variant="default" onClick={() => setPreview(undefined)}>
+              Оставить черновик
+            </Button>
+          </Stack>
+        )}
+      </Modal>
       {error && (
         <Alert role="alert" color="red">
           {error}
@@ -253,15 +355,44 @@ export function OwnerAvailability() {
       ) : (
         <>
           <Text>Пояс браузера: {browserZone}</Text>
+          <Text>Сохранённый пояс календаря: {current?.timeZone ?? 'ещё не настроен'}</Text>
+          {current?.configured &&
+            current.timeZone !== browserZone &&
+            !suppressed.includes(zonePair) &&
+            !context && (
+              <Paper withBorder p="md">
+                <Text>Пояс браузера отличается от пояса календаря</Text>
+                <Group>
+                  <Button
+                    disabled={locked}
+                    onClick={() => {
+                      suppressProposal();
+                      setZoneEditing(true);
+                      change({ ...draft, timeZone: browserZone });
+                    }}
+                  >
+                    Изменить пояс
+                  </Button>
+                  <Button disabled={locked} variant="default" onClick={suppressProposal}>
+                    Оставить текущий
+                  </Button>
+                </Group>
+              </Paper>
+            )}
+          {current?.configured && (
+            <Button variant="subtle" disabled={locked} onClick={() => setZoneEditing(true)}>
+              Изменить пояс вручную
+            </Button>
+          )}
           <TextInput
             label="Часовой пояс календаря"
             description={
               current?.configured
-                ? 'Смена настроенного пояса появится вместе с просмотром последствий.'
+                ? 'Перед сохранением нового пояса просмотрите последствия.'
                 : 'Браузер предложил пояс. Проверьте его перед первым сохранением.'
             }
             value={draft.timeZone}
-            disabled={locked || current?.configured}
+            disabled={locked || (!!current?.configured && !zoneEditing)}
             onChange={(event) => change({ ...draft, timeZone: event.currentTarget.value })}
           />
           <Text>
@@ -415,7 +546,6 @@ export function OwnerAvailability() {
                     change({
                       ...draft,
                       revision: current.revision,
-                      timeZone: current.timeZone ?? draft.timeZone,
                     });
                     setConflict(false);
                     setError('');
