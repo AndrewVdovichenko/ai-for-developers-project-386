@@ -1,3 +1,7 @@
+import { bookingTime, browserTimeZone } from './booking-time';
+import { confirmationStorage } from './booking-draft';
+import { BookingForm } from './BookingForm';
+import { Link } from 'react-router';
 import { Alert, Button, Stack, Text, Title } from '@mantine/core';
 import {
   getCurrentHold,
@@ -21,6 +25,10 @@ type SelectionContext = { key: string; fingerprint: string } & (
 );
 
 export function BookingCalendar({ id }: { id: string }) {
+  const [confirmLocked, setConfirmLocked] = useState(() => {
+    const context = confirmationStorage().load();
+    return !!context && !context.bookingId;
+  });
   const [hold, setHold] = useState<Hold>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -209,6 +217,7 @@ export function BookingCalendar({ id }: { id: string }) {
           throw new Error('Выбор сохранён. Не удалось обновить актуальное Бронирование.');
         showHold(current.data.hold, current.data.serverNow);
         setPicking(false);
+        if (confirmationStorage().load()?.bookingId) confirmationStorage().clear();
       } else if (
         result.error &&
         result.response!.status >= 400 &&
@@ -348,20 +357,21 @@ export function BookingCalendar({ id }: { id: string }) {
                 : 'Слот выбран'}
           </Title>
           <Text>
-            {new Date(hold.startsAt).toLocaleString()} — {new Date(hold.endsAt).toLocaleString()}
+            {bookingTime(hold.startsAt)} — {bookingTime(hold.endsAt)}
           </Text>
+          <Text>Ваш часовой пояс: {browserTimeZone()}</Text>
           {(hold.state === 'active' || hold.state === 'expired') && (
             <Text role="timer">
               {remaining > 0
                 ? `Осталось ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
-                : 'Срок Бронирования истёк'}
+                : 'Срок бронирования истёк. При подтверждении проверим, свободен ли слот'}
             </Text>
           )}
           <Text size="sm">Номер Бронирования: {hold.id}</Text>
           {(hold.state === 'active' || hold.state === 'expired') && (
             <>
               <Button
-                disabled={busy || unresolved}
+                disabled={busy || unresolved || confirmLocked}
                 onClick={() => {
                   setPicking(true);
                   void refresh();
@@ -370,7 +380,7 @@ export function BookingCalendar({ id }: { id: string }) {
                 Выбрать другой Слот
               </Button>
               <Button
-                disabled={busy || unresolved}
+                disabled={busy || unresolved || confirmLocked}
                 variant="outline"
                 onClick={() => void release()}
               >
@@ -380,7 +390,24 @@ export function BookingCalendar({ id }: { id: string }) {
           )}
         </Stack>
       ) : null}
-      {(!hold || picking || hold.state === 'released' || hold.state === 'replaced') && (
+      {hold &&
+        (hold.state === 'active' || hold.state === 'expired' || hold.state === 'confirmed') && (
+          <BookingForm
+            hold={hold}
+            disabled={busy || unresolved || hold.state === 'confirmed'}
+            onLocked={setConfirmLocked}
+          />
+        )}
+      {hold?.state === 'confirmed' && hold.bookingId && (
+        <Button component={Link} to={`/bookings/${hold.bookingId}`}>
+          Открыть Запись
+        </Button>
+      )}
+      {(!hold ||
+        picking ||
+        hold.state === 'released' ||
+        hold.state === 'replaced' ||
+        hold.state === 'confirmed') && (
         <SlotCalendar
           data={data}
           loading={loading}
@@ -391,7 +418,7 @@ export function BookingCalendar({ id }: { id: string }) {
             setDay(value);
             void refresh();
           }}
-          onSelect={busy || unresolved ? undefined : (slot) => void choose(slot)}
+          onSelect={busy || unresolved || confirmLocked ? undefined : (slot) => void choose(slot)}
           onRetry={() => void refresh()}
         />
       )}

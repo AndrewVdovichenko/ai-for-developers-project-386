@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from 'vitest';
 import {
+  confirmHold,
+  getBooking,
   createEventType,
   getSlotAvailability,
   guestSessionPrepareGuest,
@@ -46,6 +48,7 @@ async function fixture(instant = '2026-11-17T04:10:00.000Z', durationMinutes = 2
   const read = () => getSlotAvailability({ baseUrl, path: { id } });
   let revision = 0;
   return {
+    ownerHeaders: headers,
     pool: db.pool,
     async restart() {
       await app.close();
@@ -752,6 +755,525 @@ test('Освобождение проверяет принадлежность, 
       ).error!.code,
     ).toBe('INVALID_REQUEST');
     expect((await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold).toEqual(old);
+  } finally {
+    await f.close();
+  }
+});
+
+test('Подтверждение создаёт одну защищённую Запись, сохраняет регистр и блокирует Слот', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const hold = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    const options = {
+      baseUrl: f.baseUrl,
+      headers: { ...headers, 'Idempotency-Key': randomUUID() },
+      path: { id: hold.id },
+      body: { guestName: '  Анна 😀  ', guestEmail: ' Anna@Example.COM ' },
+    };
+    const first = await confirmHold(options);
+    expect(first.response!.status).toBe(200);
+    expect(first.data!.booking).toMatchObject({
+      holdId: hold.id,
+      guestName: 'Анна 😀',
+      guestEmail: 'Anna@Example.COM',
+      eventTypeName: 'Звонок',
+    });
+    expect(
+      (await getBooking({ baseUrl: f.baseUrl, headers, path: { id: first.data!.booking.id } }))
+        .data!.booking,
+    ).toEqual(first.data!.booking);
+    expect(
+      (
+        await getBooking({
+          baseUrl: f.baseUrl,
+          headers: f.ownerHeaders,
+          path: { id: first.data!.booking.id },
+        })
+      ).data!.booking,
+    ).toEqual(first.data!.booking);
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: hold.id } })).data!.hold,
+    ).toMatchObject({ state: 'confirmed', bookingId: first.data!.booking.id });
+    expect((await f.read()).data!.slots.some((s) => s.startsAt === hold.startsAt)).toBe(false);
+    expect(
+      (
+        await releaseHold({
+          ...options,
+          body: {},
+          headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        })
+      ).error!.code,
+    ).toBe('HOLD_ALREADY_CONFIRMED');
+    expect(
+      (await getBooking({ baseUrl: f.baseUrl, headers, path: { id: first.data!.booking.id } }))
+        .data!.booking,
+    ).toEqual(first.data!.booking);
+    f.setClock('2026-11-17T10:00:00.000Z');
+    await f.restart();
+    expect((await confirmHold(options)).data).toEqual(first.data);
+    expect(
+      (await confirmHold({ ...options, headers: { ...headers, 'Idempotency-Key': randomUUID() } }))
+        .data!.booking,
+    ).toEqual(first.data!.booking);
+    expect(
+      (
+        await confirmHold({
+          ...options,
+          headers: { ...headers, 'Idempotency-Key': randomUUID() },
+          body: { ...options.body, guestName: 'Другой' },
+        })
+      ).error!.code,
+    ).toBe('HOLD_ALREADY_CONFIRMED');
+    for (const id of [first.data!.booking.id, randomUUID(), 'invalid']) {
+      const foreign = await getBooking({
+        baseUrl: f.baseUrl,
+        headers: await f.guest(),
+        path: { id },
+      });
+      expect(foreign.response!.status).toBe(404);
+      expect(foreign.error).toEqual({ code: 'BOOKING_UNAVAILABLE', message: 'Запись недоступна' });
+      expect((await getBooking({ baseUrl: f.baseUrl, path: { id } })).error).toEqual(foreign.error);
+    }
+  } finally {
+    await f.close();
+  }
+});
+
+for (const [guestName, guestEmail, field] of [
+  ['', 'a@b.c', 'guestName'],
+  ['😀'.repeat(101), 'a@b.c', 'guestName'],
+  ['Имя', 'a@b', 'guestEmail'],
+  ['Имя', 'a @b.c', 'guestEmail'],
+  ['Имя', 'a@@b.c', 'guestEmail'],
+  ['Имя', 'a'.repeat(250) + '@b.co', 'guestEmail'],
+] as const) {
+  test(`Форма отклоняет ${field}: ${guestName.length}/${guestEmail.length}`, async () => {
+    const f = await fixture();
+    try {
+      const headers = await f.guest();
+      const result = await confirmHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        path: { id: randomUUID() },
+        body: { guestName: guestName!, guestEmail: guestEmail! },
+      });
+      expect(result.response!.status).toBe(400);
+      expect(result.error!.fieldErrors?.map((e) => e.field)).toContain(field);
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+test('Форма отвергает неизвестные поля и типы; предел Unicode сохраняется без изменения email', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const hold = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    for (const body of [
+      { guestName: 42, guestEmail: 'a@b.c' },
+      { guestName: null, guestEmail: 'a@b.c' },
+      { guestName: 'Имя', guestEmail: 'a@b.c', phone: '123' },
+    ]) {
+      // Invalid wire inputs are deliberately sent through the generated SDK.
+      const r = await confirmHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        path: { id: hold.id },
+        // @ts-expect-error invalid request at HTTP seam
+        body,
+      });
+      expect(r.error!.code).toBe('INVALID_REQUEST');
+    }
+    const r = await confirmHold({
+      baseUrl: f.baseUrl,
+      headers: { ...headers, 'Idempotency-Key': randomUUID() },
+      path: { id: hold.id },
+      body: { guestName: '😀'.repeat(100), guestEmail: 'Я'.repeat(249) + '@Б.РФ' },
+    });
+    expect(r.response!.status).toBe(200);
+    expect([...r.data!.booking.guestName]).toHaveLength(100);
+    expect([...r.data!.booking.guestEmail]).toHaveLength(254);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const expired of [false, true]) {
+  test(`Изменённые часы: подтверждение ${expired ? 'истёкшего' : 'действующего'} Бронирования`, async () => {
+    const f = await fixture();
+    try {
+      await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+      const headers = await f.guest();
+      const hold = (
+        await selectHold({
+          baseUrl: f.baseUrl,
+          headers: { ...headers, 'Idempotency-Key': randomUUID() },
+          body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+        })
+      ).data!.hold;
+      await f.save('UTC', [{ startMinute: 600, endMinute: 720 }]);
+      if (expired) f.setClock(hold.expiresAt);
+      const r = await confirmHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        path: { id: hold.id },
+        body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+      });
+      expect(r.response!.status).toBe(expired ? 409 : 200);
+      if (expired) expect(r.error!.code).toBe('SLOT_NO_LONGER_OFFERED');
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+test('Позднее подтверждение перепроверяет полный интервал, окно, прошлое и собственную Запись', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const a = await f.guest(),
+      b = await f.guest();
+    const select = (headers: typeof a, startsAt: string) =>
+      selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt },
+      });
+    const old = (await select(a, '2026-11-17T09:00:00.000Z')).data!.hold;
+    f.setClock(old.expiresAt);
+    const newer = (await select(b, old.startsAt)).data!.hold;
+    const confirm = (headers: typeof a, id: string) =>
+      confirmHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        path: { id },
+        body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+      });
+    expect((await confirm(a, old.id)).error!.code).toBe('SLOT_UNAVAILABLE');
+    await releaseHold({
+      baseUrl: f.baseUrl,
+      headers: { ...b, 'Idempotency-Key': randomUUID() },
+      path: { id: newer.id },
+      body: {},
+    });
+    expect((await confirm(a, old.id)).response!.status).toBe(200);
+    expect((await select(a, old.startsAt)).error!.code).toBe('SLOT_UNAVAILABLE');
+    const future = (await select(a, '2026-11-17T10:00:00.000Z')).data!.hold;
+    await f.save('UTC', [{ startMinute: 600, endMinute: 610 }]);
+    f.setClock(future.expiresAt);
+    expect((await confirm(a, future.id)).error!.code).toBe('SLOT_NO_LONGER_OFFERED');
+    f.setClock('2026-11-17T10:00:00.001Z');
+    expect((await confirm(a, future.id)).error!.code).toBe('SLOT_STARTED');
+  } finally {
+    await f.close();
+  }
+});
+
+for (const action of ['release', 'replace', 'confirm', 'select', 'schedule'] as const)
+  for (const confirmationFirst of [true, false]) {
+    test(`Подтверждение сериализуется с ${action}, первым ${confirmationFirst}`, async () => {
+      const f = await fixture();
+      try {
+        await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+        const a = await f.guest(),
+          b = await f.guest();
+        const select = (headers: typeof a, startsAt = '2026-11-17T09:00:00.000Z') =>
+          selectHold({
+            baseUrl: f.baseUrl,
+            headers: { ...headers, 'Idempotency-Key': randomUUID() },
+            body: { eventTypeId: f.id, startsAt },
+          });
+        const old = (await select(a)).data!.hold;
+        // Two guests hold the same interval only after both fixed leases have elapsed.
+        f.setClock(old.expiresAt);
+        const rival = action === 'confirm' ? (await select(b)).data!.hold : undefined;
+        if (rival) f.setClock(rival.expiresAt);
+        const confirm = (headers: typeof a, id: string) =>
+          confirmHold({
+            baseUrl: f.baseUrl,
+            headers: { ...headers, 'Idempotency-Key': randomUUID() },
+            path: { id },
+            body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+          });
+        const other = () =>
+          action === 'release'
+            ? releaseHold({
+                baseUrl: f.baseUrl,
+                headers: { ...a, 'Idempotency-Key': randomUUID() },
+                path: { id: old.id },
+                body: {},
+              })
+            : action === 'replace'
+              ? select(a, '2026-11-17T10:00:00.000Z')
+              : action === 'select'
+                ? select(b)
+                : action === 'confirm'
+                  ? confirm(b, rival!.id)
+                  : f.save('UTC', [{ startMinute: 600, endMinute: 720 }]);
+        const blocker = await f.pool.connect();
+        await blocker.query('BEGIN');
+        await blocker.query('SELECT id FROM calendar WHERE id=1 FOR UPDATE');
+        const one = confirmationFirst ? confirm(a, old.id) : other();
+        await waitForLock(f);
+        const two = confirmationFirst ? other() : confirm(a, old.id);
+        try {
+          await waitForLock(f, 2);
+        } finally {
+          await blocker.query('ROLLBACK');
+          blocker.release();
+        }
+        const results = await Promise.all([one, two]);
+        const result = results[confirmationFirst ? 0 : 1]!;
+        if (!('response' in result)) throw new Error('missing confirmation');
+        expect(result.response!.status).toBe(confirmationFirst ? 200 : 409);
+        const rows = (
+          await f.pool.query('SELECT state,booking_id FROM holds WHERE id=$1', [old.id])
+        ).rows;
+        expect(rows[0].state).toBe(
+          confirmationFirst
+            ? 'confirmed'
+            : action === 'release'
+              ? 'released'
+              : action === 'replace'
+                ? 'replaced'
+                : 'active',
+        );
+        expect(
+          (
+            await f.pool.query('SELECT count(*)::int AS count FROM bookings WHERE hold_id=$1', [
+              old.id,
+            ])
+          ).rows[0].count,
+        ).toBe(confirmationFirst ? 1 : 0);
+      } finally {
+        await f.close();
+      }
+    });
+  }
+
+test('Ошибка сохранения результата откатывает Запись и преобразование Бронирования', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const hold = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    await f.pool.query(
+      "CREATE FUNCTION reject_confirmation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$; CREATE TRIGGER reject_confirmation BEFORE INSERT ON operations FOR EACH ROW EXECUTE FUNCTION reject_confirmation()",
+    );
+    const key = randomUUID(),
+      options = {
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        path: { id: hold.id },
+        body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+      };
+    expect((await confirmHold(options)).response!.status).toBe(503);
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: hold.id } })).data!.hold.state,
+    ).toBe('active');
+    expect((await f.pool.query('SELECT * FROM bookings')).rowCount).toBe(0);
+    expect(
+      (await getGuestOperation({ baseUrl: f.baseUrl, headers, path: { key } })).data!.state,
+    ).toBe('unknown');
+    await f.pool.query('DROP TRIGGER reject_confirmation ON operations');
+    expect((await confirmHold(options)).response!.status).toBe(200);
+  } finally {
+    await f.close();
+  }
+});
+
+test('Два одновременных подтверждения одним ключом возвращают один сохранённый результат', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const hold = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    const key = randomUUID(),
+      options = {
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        path: { id: hold.id },
+        body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+      };
+    const blocker = await f.pool.connect();
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT id FROM calendar WHERE id=1 FOR UPDATE');
+    const a = confirmHold(options),
+      b = confirmHold(options);
+    try {
+      await waitForLock(f, 2);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+    }
+    const results = await Promise.all([a, b]);
+    expect(results[0].response!.status).toBe(200);
+    expect(results[1].data).toEqual(results[0].data);
+    expect((await f.pool.query('SELECT count(*)::int AS count FROM bookings')).rows[0].count).toBe(
+      1,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+for (const confirmFirst of [true, false])
+  test(`Ожидание пересекает точный срок: первым подтверждение ${confirmFirst}`, async () => {
+    const f = await fixture();
+    try {
+      await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+      const a = await f.guest(),
+        b = await f.guest();
+      const body = { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' };
+      const hold = (
+        await selectHold({
+          baseUrl: f.baseUrl,
+          headers: { ...a, 'Idempotency-Key': randomUUID() },
+          body,
+        })
+      ).data!.hold;
+      f.setClock('2026-11-17T04:14:59.999Z');
+      const confirm = () =>
+        confirmHold({
+          baseUrl: f.baseUrl,
+          headers: { ...a, 'Idempotency-Key': randomUUID() },
+          path: { id: hold.id },
+          body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+        });
+      const select = () =>
+        selectHold({
+          baseUrl: f.baseUrl,
+          headers: { ...b, 'Idempotency-Key': randomUUID() },
+          body,
+        });
+      const blocker = await f.pool.connect();
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT id FROM calendar WHERE id=1 FOR UPDATE');
+      const one = confirmFirst ? confirm() : select();
+      await waitForLock(f);
+      const two = confirmFirst ? select() : confirm();
+      try {
+        await waitForLock(f, 2);
+        f.setClock(hold.expiresAt);
+      } finally {
+        await blocker.query('ROLLBACK');
+        blocker.release();
+      }
+      const results = await Promise.all([one, two]);
+      expect(results.map((r) => r.response!.status)).toEqual([200, 409]);
+      const result = results[confirmFirst ? 0 : 1];
+      if (confirmFirst) expect(result.data).toMatchObject({ serverNow: hold.expiresAt });
+      else expect(result.error!.code).toBe('SLOT_UNAVAILABLE');
+      expect(
+        (await f.pool.query('SELECT count(*)::int AS count FROM bookings')).rows[0].count,
+      ).toBe(confirmFirst ? 1 : 0);
+    } finally {
+      await f.close();
+    }
+  });
+
+test('Решение до срока коммитится после срока без повторного изменения времени решения', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const hold = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    // SQL boundary pauses after business decision and conversion, before result+COMMIT.
+    await f.pool.query(
+      "CREATE FUNCTION pause_confirmation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(386,21); RETURN NEW; END $$; CREATE TRIGGER pause_confirmation BEFORE INSERT ON operations FOR EACH ROW WHEN (NEW.action='confirm-hold') EXECUTE FUNCTION pause_confirmation()",
+    );
+    f.setClock('2026-11-17T04:14:59.999Z');
+    const blocker = await f.pool.connect();
+    await blocker.query('SELECT pg_advisory_lock(386,21)');
+    const key = randomUUID(),
+      options = {
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        path: { id: hold.id },
+        body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+      };
+    const pending = confirmHold(options);
+    try {
+      await waitForLock(f);
+      f.setClock(hold.expiresAt);
+      expect(
+        (await getGuestOperation({ baseUrl: f.baseUrl, headers, path: { key } })).data!.state,
+      ).toBe('unknown');
+    } finally {
+      await blocker.query('SELECT pg_advisory_unlock(386,21)');
+      blocker.release();
+    }
+    const result = await pending;
+    expect(result.response!.status).toBe(200);
+    expect(result.data!.serverNow).toBe('2026-11-17T04:14:59.999Z');
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: hold.id } })).data!.hold.state,
+    ).toBe('confirmed');
+    await f.restart();
+    expect((await confirmHold(options)).data).toEqual(result.data);
+  } finally {
+    await f.close();
+  }
+});
+
+test('Действующее Бронирование нельзя подтвердить после начала встречи', async () => {
+  const f = await fixture('2026-11-17T08:59:00.000Z');
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const hold = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    f.setClock('2026-11-17T09:00:00.001Z');
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: hold.id } })).data!.hold.state,
+    ).toBe('active');
+    const result = await confirmHold({
+      baseUrl: f.baseUrl,
+      headers: { ...headers, 'Idempotency-Key': randomUUID() },
+      path: { id: hold.id },
+      body: { guestName: 'Гость', guestEmail: 'a@b.c' },
+    });
+    expect(result.error!.code).toBe('SLOT_STARTED');
+    expect((await f.pool.query('SELECT * FROM bookings')).rowCount).toBe(0);
   } finally {
     await f.close();
   }

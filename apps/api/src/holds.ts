@@ -15,7 +15,7 @@ type HoldRow = {
   bookingId: string | null;
 };
 const columns = `id,event_type_id AS "eventTypeId",starts_at AS "startsAt",ends_at AS "endsAt",expires_at AS "expiresAt",state,booking_id AS "bookingId"`;
-async function decisionTime(client: pg.Pool | pg.PoolClient, clock?: () => Date) {
+export async function decisionTime(client: pg.Pool | pg.PoolClient, clock?: () => Date) {
   return (
     clock?.() ??
     (await client.query<{ now: Date }>('SELECT clock_timestamp()::timestamptz(3) AS now')).rows[0]!
@@ -120,7 +120,7 @@ export async function selectHold(
       );
       if (!slot) return fail(409, 'SLOT_NO_LONGER_OFFERED', 'Слот больше не предлагается');
       const occupied = await client.query(
-        "SELECT id FROM holds WHERE state='active' AND guest_id<>$4 AND expires_at>$1 AND starts_at<$3 AND ends_at>$2 LIMIT 1",
+        "SELECT id FROM holds WHERE state='active' AND guest_id<>$4 AND expires_at>$1 AND starts_at<$3 AND ends_at>$2 UNION ALL SELECT id FROM bookings WHERE starts_at<$3 AND ends_at>$2",
         [now, slot.startsAt, slot.endsAt, guestId],
       );
       if (occupied.rowCount)
