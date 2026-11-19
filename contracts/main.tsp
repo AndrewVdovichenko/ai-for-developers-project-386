@@ -91,3 +91,18 @@ namespace OwnerAvailability {
   @get op getAvailability(): AvailabilityResponse | Unauthorized | Unavailable | InternalError;
   @put op saveAvailability(@header("Idempotency-Key") key: string, @body body: SaveAvailability): AvailabilityResponse | BadRequest | Unauthorized | Forbidden | Conflict | Unavailable | InternalError;
 }
+
+/** Concrete UTC instants always include milliseconds and Z. */
+@pattern("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$")
+scalar UtcInstant extends string;
+model Slot { startsAt: UtcInstant; endsAt: UtcInstant; }
+model SlotAvailability {
+  configured: boolean;
+  serverNow: UtcInstant;
+  timeZone: string | null;
+  windowStartsAt: UtcInstant | null;
+  windowEndsAt: UtcInstant | null;
+  slots: Slot[];
+}
+@route("/api/event-types/{id}/availability")
+@get op getSlotAvailability(@path id: string): SlotAvailability | NotFound | Unavailable | InternalError;

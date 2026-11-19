@@ -7,7 +7,12 @@ try {
   await db.migrate();
   const password = 'тестовый пароль Владельца'; // betterleaks:allow -- public test fixture
   await resetPassword(db.pool, password, password);
-  const app = createApp({ pool: db.pool, origin: 'http://127.0.0.1:4174' });
+  // Fixed authoritative clock makes DST and browser date boundaries reproducible.
+  const app = createApp({
+    pool: db.pool,
+    origin: 'http://127.0.0.1:4174',
+    now: () => new Date('2026-10-24T22:00:00.000Z'),
+  });
   for (const signal of ['SIGTERM', 'SIGINT'] as const)
     process.once(signal, () => {
       void app

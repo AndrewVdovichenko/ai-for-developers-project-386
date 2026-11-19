@@ -1,5 +1,6 @@
 export {
   getStatus,
+  getSlotAvailability,
   createEventType,
   eventTypesListEventTypes,
   eventTypesGetEventType,
@@ -11,6 +12,8 @@ export {
   ownerSessionLogoutOwner,
 } from './generated/sdk.gen.js';
 export type {
+  Slot,
+  SlotAvailability,
   EventType,
   CreateEventType,
   ApiError,

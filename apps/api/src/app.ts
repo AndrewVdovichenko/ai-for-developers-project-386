@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { getSlotAvailability } from './slots.js';
 import pg from 'pg';
 import { createEventType, getEventType, listEventTypes } from './event-types.js';
 import { ownerSubject, readOperation } from './operations.js';
@@ -131,6 +132,16 @@ export function createApp(options: {
       reply.code(404).send({ code: 'EVENT_TYPE_NOT_FOUND', message: 'Тип встречи не найден' })
     );
   });
+  app.get<{ Params: { id: string } }>(
+    '/api/event-types/:id/availability',
+    async (request, reply) => {
+      const result = await getSlotAvailability(options.pool, request.params.id, now);
+      return (
+        result ??
+        reply.code(404).send({ code: 'EVENT_TYPE_NOT_FOUND', message: 'Тип встречи не найден' })
+      );
+    },
+  );
   app.post('/api/owner/event-types', async (request, reply) => {
     const result = await createEventType(
       options.pool,
