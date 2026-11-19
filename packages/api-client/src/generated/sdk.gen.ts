@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { ConfirmHoldData, ConfirmHoldErrors, ConfirmHoldResponses, CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetBookingData, GetBookingErrors, GetBookingResponses, GetCurrentHoldData, GetCurrentHoldErrors, GetCurrentHoldResponses, GetGuestOperationData, GetGuestOperationErrors, GetGuestOperationResponses, GetHoldData, GetHoldErrors, GetHoldResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetSlotAvailabilityData, GetSlotAvailabilityErrors, GetSlotAvailabilityResponses, GetStatusData, GetStatusResponses, GuestSessionPrepareGuestData, GuestSessionPrepareGuestErrors, GuestSessionPrepareGuestResponses, GuestSessionVerifyGuestData, GuestSessionVerifyGuestErrors, GuestSessionVerifyGuestResponses, OwnerAvailabilityGetAvailabilityData, OwnerAvailabilityGetAvailabilityErrors, OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilitySaveAvailabilityData, OwnerAvailabilitySaveAvailabilityErrors, OwnerAvailabilitySaveAvailabilityResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses, ReleaseHoldData, ReleaseHoldErrors, ReleaseHoldResponses, SelectHoldData, SelectHoldErrors, SelectHoldResponses } from './types.gen.js';
+import type { ConfirmHoldData, ConfirmHoldErrors, ConfirmHoldResponses, CreateEventTypeData, CreateEventTypeErrors, CreateEventTypeResponses, EventTypesGetEventTypeData, EventTypesGetEventTypeErrors, EventTypesGetEventTypeResponses, EventTypesListEventTypesData, EventTypesListEventTypesErrors, EventTypesListEventTypesResponses, GetBookingData, GetBookingErrors, GetBookingResponses, GetCurrentHoldData, GetCurrentHoldErrors, GetCurrentHoldResponses, GetGuestOperationData, GetGuestOperationErrors, GetGuestOperationResponses, GetHoldData, GetHoldErrors, GetHoldResponses, GetOwnerOperationData, GetOwnerOperationErrors, GetOwnerOperationResponses, GetSlotAvailabilityData, GetSlotAvailabilityErrors, GetSlotAvailabilityResponses, GetStatusData, GetStatusResponses, GuestSessionPrepareGuestData, GuestSessionPrepareGuestErrors, GuestSessionPrepareGuestResponses, GuestSessionVerifyGuestData, GuestSessionVerifyGuestErrors, GuestSessionVerifyGuestResponses, OwnerAvailabilityGetAvailabilityData, OwnerAvailabilityGetAvailabilityErrors, OwnerAvailabilityGetAvailabilityResponses, OwnerAvailabilityPreviewAvailabilityData, OwnerAvailabilityPreviewAvailabilityErrors, OwnerAvailabilityPreviewAvailabilityResponses, OwnerAvailabilitySaveAvailabilityData, OwnerAvailabilitySaveAvailabilityErrors, OwnerAvailabilitySaveAvailabilityResponses, OwnerSessionGetOwnerSessionData, OwnerSessionGetOwnerSessionErrors, OwnerSessionGetOwnerSessionResponses, OwnerSessionLoginOwnerData, OwnerSessionLoginOwnerErrors, OwnerSessionLoginOwnerResponses, OwnerSessionLogoutOwnerData, OwnerSessionLogoutOwnerErrors, OwnerSessionLogoutOwnerResponses, ReleaseHoldData, ReleaseHoldErrors, ReleaseHoldResponses, SelectHoldData, SelectHoldErrors, SelectHoldResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -76,6 +76,15 @@ export const ownerAvailabilityGetAvailability = <ThrowOnError extends boolean = 
 
 export const ownerAvailabilitySaveAvailability = <ThrowOnError extends boolean = false>(options: Options<OwnerAvailabilitySaveAvailabilityData, ThrowOnError>): RequestResult<OwnerAvailabilitySaveAvailabilityResponses, OwnerAvailabilitySaveAvailabilityErrors, ThrowOnError> => (options.client ?? client).put<OwnerAvailabilitySaveAvailabilityResponses, OwnerAvailabilitySaveAvailabilityErrors, ThrowOnError>({
     url: '/api/owner/availability',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const ownerAvailabilityPreviewAvailability = <ThrowOnError extends boolean = false>(options: Options<OwnerAvailabilityPreviewAvailabilityData, ThrowOnError>): RequestResult<OwnerAvailabilityPreviewAvailabilityResponses, OwnerAvailabilityPreviewAvailabilityErrors, ThrowOnError> => (options.client ?? client).post<OwnerAvailabilityPreviewAvailabilityResponses, OwnerAvailabilityPreviewAvailabilityErrors, ThrowOnError>({
+    url: '/api/owner/availability/preview',
     ...options,
     headers: {
         'Content-Type': 'application/json',

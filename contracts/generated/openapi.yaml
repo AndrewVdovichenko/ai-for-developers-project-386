@@ -637,6 +637,59 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SaveAvailability'
+  /api/owner/availability/preview:
+    post:
+      operationId: OwnerAvailability_previewAvailability
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityPreview'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewAvailability'
   /api/owner/event-types:
     post:
       operationId: createEventType
@@ -847,6 +900,34 @@ paths:
                 $ref: '#/components/schemas/ApiError'
 components:
   schemas:
+    AffectedHold:
+      type: object
+      required:
+        - expiresAt
+      properties:
+        expiresAt:
+          type: string
+      allOf:
+        - $ref: '#/components/schemas/AffectedInterval'
+    AffectedInterval:
+      type: object
+      required:
+        - id
+        - eventTypeId
+        - eventTypeName
+        - startsAt
+        - endsAt
+      properties:
+        id:
+          type: string
+        eventTypeId:
+          type: string
+        eventTypeName:
+          type: string
+        startsAt:
+          type: string
+        endsAt:
+          type: string
     ApiError:
       type: object
       required:
@@ -899,6 +980,29 @@ components:
         retryAfterSeconds:
           type: integer
           format: int32
+    AvailabilityPreview:
+      type: object
+      required:
+        - confirmationToken
+        - expiresAt
+        - serverNow
+        - affectedBookings
+        - affectedHolds
+      properties:
+        confirmationToken:
+          type: string
+        expiresAt:
+          type: string
+        serverNow:
+          type: string
+        affectedBookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AffectedInterval'
+        affectedHolds:
+          type: array
+          items:
+            $ref: '#/components/schemas/AffectedHold'
     AvailabilityResponse:
       type: object
       required:
@@ -1101,6 +1205,22 @@ components:
           required:
             - state
             - response
+    PreviewAvailability:
+      type: object
+      required:
+        - revision
+        - timeZone
+        - days
+      properties:
+        revision:
+          type: integer
+          format: int32
+        timeZone:
+          type: string
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyDay'
     SaveAvailability:
       type: object
       required:

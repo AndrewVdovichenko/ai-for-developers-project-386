@@ -19,24 +19,7 @@ export function calculateSlots(
     slots: [],
   };
   if (!settings.timeZone) return empty;
-  const format = new Intl.DateTimeFormat('en-GB', {
-    timeZone: settings.timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  });
-  function local(stamp: number) {
-    const parts = Object.fromEntries(
-      format.formatToParts(stamp).map((part) => [part.type, part.value]),
-    );
-    return {
-      date: Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)),
-      clock: Number(parts.hour) * 60 + Number(parts.minute),
-    };
-  }
+  const local = localClock(settings.timeZone);
   const today = local(serverNow.getTime()).date;
   const after = today + 14 * day;
   let windowStart: number | undefined;
@@ -52,22 +35,18 @@ export function calculateSlots(
       windowEnd = stamp;
       break;
     }
-    const weekday = new Date(current.date).getUTCDay() || 7;
-    const intervals = settings.days.find((item) => item.weekday === weekday)!.intervals;
-    const index = intervals.findIndex(
-      (interval) => current.clock >= interval.startMinute && current.clock < interval.endMinute,
-    );
-    if (index < 0) {
+    const working = workingPosition(settings.days, current);
+    if (!working) {
       previous = undefined;
       continue;
     }
-    const key = `${current.date}:${index}`;
+    const { key, startMinute } = working;
     if (!previous || previous.key !== key || previous.end !== stamp) {
       previous = { start: stamp, end: stamp, candidates: [], key };
       runs.push(previous);
     }
     previous.end = stamp + minute;
-    if ((current.clock - intervals[index]!.startMinute) % 15 === 0 && stamp >= serverNow.getTime())
+    if ((current.clock - startMinute) % 15 === 0 && stamp >= serverNow.getTime())
       previous.candidates.push(stamp);
   }
   const duration = durationMinutes * minute;
@@ -85,4 +64,60 @@ export function calculateSlots(
     windowEndsAt: new Date(windowEnd!).toISOString(),
     slots,
   };
+}
+
+function localClock(timeZone: string) {
+  const format = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  function local(stamp: number) {
+    const parts = Object.fromEntries(
+      format.formatToParts(stamp).map((part) => [part.type, part.value]),
+    );
+    return {
+      date: Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)),
+      clock: Number(parts.hour) * 60 + Number(parts.minute),
+    };
+  }
+  return local;
+}
+// Same continuous local-date/working-interval runs as slot generation, without
+// the public booking window or the 15-minute start grid.
+export function intervalFitsWorkingHours(
+  settings: { timeZone: string; days: WeeklyDay[] },
+  startsAt: Date,
+  endsAt: Date,
+) {
+  const local = localClock(settings.timeZone);
+  let key: string | undefined;
+  for (
+    let stamp = Math.floor(startsAt.getTime() / minute) * minute;
+    stamp < endsAt.getTime();
+    stamp += minute
+  ) {
+    const current = local(stamp);
+    const working = workingPosition(settings.days, current);
+    if (!working) return false;
+    const nextKey = working.key;
+    if (key !== undefined && key !== nextKey) return false;
+    key = nextKey;
+  }
+  return startsAt < endsAt;
+}
+
+function workingPosition(days: WeeklyDay[], current: { date: number; clock: number }) {
+  const weekday = new Date(current.date).getUTCDay() || 7;
+  const intervals = days.find((item) => item.weekday === weekday)!.intervals;
+  const index = intervals.findIndex(
+    (interval) => current.clock >= interval.startMinute && current.clock < interval.endMinute,
+  );
+  return index < 0
+    ? undefined
+    : { key: `${current.date}:${index}`, startMinute: intervals[index]!.startMinute };
 }
