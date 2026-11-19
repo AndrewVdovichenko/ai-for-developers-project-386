@@ -17,7 +17,7 @@ export type AffectedInterval = {
 };
 
 export type ApiError = {
-    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED' | 'GUEST_SESSION_REQUIRED' | 'HOLD_UNAVAILABLE' | 'SLOT_UNAVAILABLE' | 'SLOT_STARTED' | 'SLOT_NO_LONGER_OFFERED' | 'HOLD_ALREADY_CONFIRMED' | 'HOLD_REPLACED' | 'HOLD_RELEASED' | 'BOOKING_UNAVAILABLE';
+    code: 'INVALID_REQUEST' | 'OWNER_AUTH_REQUIRED' | 'INVALID_PASSWORD' | 'ORIGIN_NOT_ALLOWED' | 'OWNER_NOT_CONFIGURED' | 'LOGIN_RATE_LIMITED' | 'TEMPORARILY_UNAVAILABLE' | 'INTERNAL_ERROR' | 'VALIDATION_FAILED' | 'IDEMPOTENCY_KEY_REQUIRED' | 'IDEMPOTENCY_KEY_REUSED' | 'EVENT_TYPE_NOT_FOUND' | 'REVISION_CONFLICT' | 'PREVIEW_REQUIRED' | 'GUEST_SESSION_REQUIRED' | 'HOLD_UNAVAILABLE' | 'SLOT_UNAVAILABLE' | 'SLOT_STARTED' | 'SLOT_NO_LONGER_OFFERED' | 'HOLD_ALREADY_CONFIRMED' | 'HOLD_REPLACED' | 'HOLD_RELEASED' | 'BOOKING_UNAVAILABLE' | 'INVALID_FILTER';
     message: string;
     fieldErrors?: Array<{
         field: string;
@@ -125,6 +125,11 @@ export type OperationResult = {
 } | {
     state: 'completed';
     response: OperationResponse;
+};
+
+export type OwnerBookings = {
+    items: Array<Booking>;
+    serverNow: UtcInstant;
 };
 
 export type PreviewAvailability = {
@@ -808,6 +813,45 @@ export type OwnerAvailabilityPreviewAvailabilityResponses = {
 };
 
 export type OwnerAvailabilityPreviewAvailabilityResponse = OwnerAvailabilityPreviewAvailabilityResponses[keyof OwnerAvailabilityPreviewAvailabilityResponses];
+
+export type ListOwnerBookingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        eventTypeId?: Array<string>;
+    };
+    url: '/api/owner/bookings';
+};
+
+export type ListOwnerBookingsErrors = {
+    /**
+     * The server could not understand the request due to invalid syntax.
+     */
+    400: ApiError;
+    /**
+     * Access is unauthorized.
+     */
+    401: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type ListOwnerBookingsError = ListOwnerBookingsErrors[keyof ListOwnerBookingsErrors];
+
+export type ListOwnerBookingsResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: OwnerBookings;
+};
+
+export type ListOwnerBookingsResponse = ListOwnerBookingsResponses[keyof ListOwnerBookingsResponses];
 
 export type CreateEventTypeData = {
     body: CreateEventType;

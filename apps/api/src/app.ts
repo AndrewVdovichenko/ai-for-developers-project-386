@@ -1,4 +1,4 @@
-import { confirmHold, readBooking } from './bookings.js';
+import { confirmHold, readBooking, listOwnerBookings } from './bookings.js';
 import { guest, guestSecret, prepareGuest, requireGuest } from './guests.js';
 import { guestSubject, readHold, selectHold, releaseHold } from './holds.js';
 import Fastify from 'fastify';
@@ -206,6 +206,9 @@ export function createApp(options: {
       guestSubject(requireGuest(await guestId(request.headers.cookie))),
       request.params.key,
     ),
+  );
+  app.get<{ Querystring: { eventTypeId?: unknown } }>('/api/owner/bookings', (request) =>
+    listOwnerBookings(options.pool, request.query.eventTypeId, options.decisionNow),
   );
   app.get('/api/event-types', () => listEventTypes(options.pool));
   app.get('/api/owner/availability', () => getAvailability(options.pool));

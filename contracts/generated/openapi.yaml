@@ -690,6 +690,48 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PreviewAvailability'
+  /api/owner/bookings:
+    get:
+      operationId: listOwnerBookings
+      parameters:
+        - name: eventTypeId
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerBookings'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/owner/event-types:
     post:
       operationId: createEventType
@@ -960,6 +1002,7 @@ components:
             - HOLD_REPLACED
             - HOLD_RELEASED
             - BOOKING_UNAVAILABLE
+            - INVALID_FILTER
         message:
           type: string
         fieldErrors:
@@ -1205,6 +1248,18 @@ components:
           required:
             - state
             - response
+    OwnerBookings:
+      type: object
+      required:
+        - items
+        - serverNow
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+        serverNow:
+          $ref: '#/components/schemas/UtcInstant'
     PreviewAvailability:
       type: object
       required:

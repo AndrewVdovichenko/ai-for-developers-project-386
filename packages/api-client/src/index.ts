@@ -1,4 +1,5 @@
 export {
+  listOwnerBookings,
   confirmHold,
   getBooking,
   guestSessionPrepareGuest,
@@ -22,6 +23,7 @@ export {
   ownerSessionLogoutOwner,
 } from './generated/sdk.gen.js';
 export type {
+  OwnerBookings,
   Booking,
   BookingResponse,
   ConfirmBooking,
