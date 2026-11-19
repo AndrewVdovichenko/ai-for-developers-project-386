@@ -156,9 +156,13 @@ test('последствия требуют повторного просмот�
     await page.getByRole('button', { name: 'Изменить пояс вручную' }).click();
     await page.getByLabel('Часовой пояс календаря', { exact: true }).fill('Pacific/Honolulu');
     await page.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText('Затронутые Записи: 1');
-    await expect(page.getByRole('dialog')).toContainText('Действующие Бронирования: 3');
-    await expect(page.getByRole('dialog')).toContainText(f.booked.startsAt);
+    await expect(page.getByRole('dialog')).toContainText(
+      `${f.type.name}: ${f.booked.startsAt} — ${f.booked.endsAt}`,
+    );
+    for (const selected of f.selected.slice(1))
+      await expect(page.getByRole('dialog')).toContainText(
+        `${f.type.name}: ${selected.hold.startsAt} — ${selected.hold.endsAt}`,
+      );
     await f.sdk.releaseHold({
       baseUrl: f.baseUrl,
       headers: { ...f.selected[1]!.headers, 'Idempotency-Key': crypto.randomUUID() },
@@ -169,7 +173,13 @@ test('последствия требуют повторного просмот�
     await expect(page.getByRole('alert')).toContainText('Последствия изменились');
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await page.getByRole('button', { name: 'Сохранить Расписание', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText('Действующие Бронирования: 2');
+    await expect(page.getByRole('dialog')).not.toContainText(
+      `${f.type.name}: ${f.selected[1]!.hold.startsAt}`,
+    );
+    for (const selected of f.selected.slice(2))
+      await expect(page.getByRole('dialog')).toContainText(
+        `${f.type.name}: ${selected.hold.startsAt} — ${selected.hold.endsAt}`,
+      );
     await page.getByRole('button', { name: 'Подтвердить смену пояса', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Расписание сохранено');
     expect(
