@@ -1,6 +1,8 @@
 import { Alert, Button, Stack, Text, Title } from '@mantine/core';
 import {
   getCurrentHold,
+  getHold,
+  releaseHold,
   selectHold,
   getGuestOperation,
   guestSessionVerifyGuest,
@@ -13,6 +15,11 @@ import { getSlotAvailability } from '@calendar/api-client';
 import type { SlotAvailability } from '@calendar/api-client';
 import { SlotCalendar } from './SlotCalendar';
 
+type SelectionContext = { key: string; fingerprint: string } & (
+  | { action?: 'select'; eventTypeId: string; startsAt: string }
+  | { action: 'release'; holdId: string }
+);
+
 export function BookingCalendar({ id }: { id: string }) {
   const [hold, setHold] = useState<Hold>();
   const [message, setMessage] = useState('');
@@ -20,17 +27,13 @@ export function BookingCalendar({ id }: { id: string }) {
   const [unresolved, setUnresolved] = useState(false);
   const [remaining, setRemaining] = useState(0);
   const deadline = useRef(0);
-  const storage = useRef<
-    ReturnType<
-      typeof operationStorage<{
-        key: string;
-        fingerprint: string;
-        eventTypeId: string;
-        startsAt: string;
-      }>
-    >
-  >(undefined);
+  const [picking, setPicking] = useState(false);
+  const shown = useRef<Hold | null>(null);
+  const working = useRef(false);
+  const holdEpoch = useRef(0);
+  const storage = useRef<ReturnType<typeof operationStorage<SelectionContext>>>(undefined);
   const showHold = useCallback((value: Hold | null, serverNow: string) => {
+    shown.current = value;
     setHold(value ?? undefined);
     deadline.current = value
       ? performance.now() + Math.max(0, Date.parse(value.expiresAt) - Date.parse(serverNow))
@@ -41,6 +44,7 @@ export function BookingCalendar({ id }: { id: string }) {
     storage.current = operationStorage('guest-selection', 'guest_selection', (context) => context);
     let active = true;
     const recover = async () => {
+      const epoch = ++holdEpoch.current;
       try {
         const context = storage.current?.load();
         if (context) {
@@ -65,12 +69,18 @@ export function BookingCalendar({ id }: { id: string }) {
             });
             if (!verified.data?.ready)
               throw new Error('Принадлежность прежнего выбора не подтверждена');
-            const replay = await selectHold({
+            const options = {
               baseUrl: location.origin,
               headers: { 'Idempotency-Key': context.key },
-              body: { eventTypeId: context.eventTypeId, startsAt: context.startsAt },
               signal: AbortSignal.timeout(15000),
-            });
+            };
+            const replay =
+              context.action === 'release'
+                ? await releaseHold({ ...options, path: { id: context.holdId }, body: {} })
+                : await selectHold({
+                    ...options,
+                    body: { eventTypeId: context.eventTypeId, startsAt: context.startsAt },
+                  });
             if (
               replay.data ||
               (replay.error &&
@@ -78,6 +88,10 @@ export function BookingCalendar({ id }: { id: string }) {
                 replay.response!.status < 500 &&
                 replay.response!.status !== 401)
             ) {
+              if (replay.error) {
+                setMessage(replay.error.message);
+                window.dispatchEvent(new Event('calendar:availability-conflict'));
+              }
               storage.current?.clear();
               setUnresolved(false);
             } else throw new Error('Исход выбора пока неизвестен');
@@ -88,13 +102,62 @@ export function BookingCalendar({ id }: { id: string }) {
           baseUrl: location.origin,
           signal: AbortSignal.timeout(15000),
         });
-        if (active && current.data) showHold(current.data.hold, current.data.serverNow);
+        if (active && epoch === holdEpoch.current && current.data)
+          showHold(current.data.hold, current.data.serverNow);
       } catch {
-        if (active)
+        if (active && epoch === holdEpoch.current)
           setMessage('Не удалось восстановить выбор. Обновите страницу для повторной проверки.');
       }
     };
     void recover();
+    const reconcile = async () => {
+      if (document.visibilityState !== 'visible' || working.current || storage.current?.load())
+        return;
+      const epoch = ++holdEpoch.current;
+      const previous = shown.current;
+      try {
+        const specific = previous
+          ? await getHold({
+              baseUrl: location.origin,
+              path: { id: previous.id },
+              signal: AbortSignal.timeout(15000),
+            })
+          : undefined;
+        if (working.current || storage.current?.load() || !active || epoch !== holdEpoch.current)
+          return;
+        if (specific && !specific.data) throw new Error('Бронирование недоступно');
+        const current = await getCurrentHold({
+          baseUrl: location.origin,
+          signal: AbortSignal.timeout(15000),
+        });
+        if (working.current || storage.current?.load() || !active || epoch !== holdEpoch.current)
+          return;
+        if (!previous && current.response?.status === 401) return;
+        if (!current.data) throw new Error('Не удалось проверить выбор');
+        if (
+          previous &&
+          (current.data.hold?.id !== previous.id ||
+            (specific?.data &&
+              previous.state !== specific.data.hold.state &&
+              ['replaced', 'released'].includes(specific.data.hold.state)))
+        ) {
+          setMessage('Выбор изменён в другой вкладке. Проверьте актуальное Бронирование.');
+          setPicking(false);
+        }
+        showHold(current.data.hold, current.data.serverNow);
+      } catch {
+        if (active && epoch === holdEpoch.current)
+          setMessage('Не удалось обновить Бронирование. Показан прежний выбор.');
+      }
+    };
+    const visible = () => {
+      void reconcile();
+    };
+    window.addEventListener('focus', visible);
+    window.addEventListener('online', visible);
+    window.addEventListener('storage', visible);
+    document.addEventListener('visibilitychange', visible);
+    const refreshTimer = window.setInterval(visible, 60000);
     const timer = window.setInterval(
       () => setRemaining(Math.max(0, Math.ceil((deadline.current - performance.now()) / 1000))),
       1000,
@@ -102,15 +165,23 @@ export function BookingCalendar({ id }: { id: string }) {
     return () => {
       active = false;
       clearInterval(timer);
+      clearInterval(refreshTimer);
+      window.removeEventListener('focus', visible);
+      window.removeEventListener('online', visible);
+      window.removeEventListener('storage', visible);
+      document.removeEventListener('visibilitychange', visible);
     };
   }, [showHold]);
   const choose = async (slot: Slot) => {
-    if (busy || storage.current?.load()) return;
+    if (working.current || storage.current?.load()) return;
+    holdEpoch.current++;
+    working.current = true;
     setBusy(true);
     setMessage('');
     try {
       await ensureGuest();
       const context = {
+        action: 'select' as const,
         key: crypto.randomUUID(),
         fingerprint: JSON.stringify([id, slot.startsAt]),
         eventTypeId: id,
@@ -130,7 +201,14 @@ export function BookingCalendar({ id }: { id: string }) {
       if (result.data) {
         storage.current.clear();
         setUnresolved(false);
-        showHold(result.data.hold, result.data.serverNow);
+        const current = await getCurrentHold({
+          baseUrl: location.origin,
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!current.data)
+          throw new Error('Выбор сохранён. Не удалось обновить актуальное Бронирование.');
+        showHold(current.data.hold, current.data.serverNow);
+        setPicking(false);
       } else if (
         result.error &&
         result.response!.status >= 400 &&
@@ -145,6 +223,61 @@ export function BookingCalendar({ id }: { id: string }) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось выполнить выбор');
     } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  };
+  const release = async () => {
+    if (!hold || working.current || storage.current?.load()) return;
+    holdEpoch.current++;
+    working.current = true;
+    setBusy(true);
+    setMessage('');
+    try {
+      const context: SelectionContext = {
+        action: 'release',
+        key: crypto.randomUUID(),
+        fingerprint: JSON.stringify(['release', hold.id]),
+        holdId: hold.id,
+      };
+      if (!storage.current?.persist(context))
+        throw new Error(
+          'Не удалось сохранить ключ операции. Разрешите хранилище браузера и cookie.',
+        );
+      setUnresolved(true);
+      const result = await releaseHold({
+        baseUrl: location.origin,
+        path: { id: hold.id },
+        headers: { 'Idempotency-Key': context.key },
+        body: {},
+        signal: AbortSignal.timeout(15000),
+      });
+      if (
+        result.data ||
+        (result.error &&
+          result.response!.status >= 400 &&
+          result.response!.status < 500 &&
+          result.response!.status !== 401)
+      ) {
+        storage.current.clear();
+        setUnresolved(false);
+        if (result.data) {
+          // A completed operation is historical: read the current choice after any concurrent replacement.
+          const current = await getCurrentHold({
+            baseUrl: location.origin,
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!current.data)
+            throw new Error('Освобождение сохранено. Не удалось обновить актуальное Бронирование.');
+          showHold(current.data.hold, current.data.serverNow);
+          setPicking(false);
+          window.dispatchEvent(new Event('calendar:availability-conflict'));
+        } else setMessage(result.error!.message);
+      } else throw new Error('Исход освобождения неизвестен. Проверьте результат операции.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось освободить Бронирование');
+    } finally {
+      working.current = false;
       setBusy(false);
     }
   };
@@ -207,18 +340,47 @@ export function BookingCalendar({ id }: { id: string }) {
       )}
       {hold ? (
         <Stack aria-label="Выбранное Бронирование">
-          <Title order={3}>Слот выбран</Title>
+          <Title order={3}>
+            {hold.state === 'released'
+              ? 'Бронирование освобождено'
+              : hold.state === 'replaced'
+                ? 'Бронирование заменено'
+                : 'Слот выбран'}
+          </Title>
           <Text>
             {new Date(hold.startsAt).toLocaleString()} — {new Date(hold.endsAt).toLocaleString()}
           </Text>
-          <Text role="timer">
-            {remaining > 0
-              ? `Осталось ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
-              : 'Срок Бронирования истёк'}
-          </Text>
+          {(hold.state === 'active' || hold.state === 'expired') && (
+            <Text role="timer">
+              {remaining > 0
+                ? `Осталось ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
+                : 'Срок Бронирования истёк'}
+            </Text>
+          )}
           <Text size="sm">Номер Бронирования: {hold.id}</Text>
+          {(hold.state === 'active' || hold.state === 'expired') && (
+            <>
+              <Button
+                disabled={busy || unresolved}
+                onClick={() => {
+                  setPicking(true);
+                  void refresh();
+                }}
+              >
+                Выбрать другой Слот
+              </Button>
+              <Button
+                disabled={busy || unresolved}
+                variant="outline"
+                onClick={() => void release()}
+              >
+                Освободить Бронирование
+              </Button>
+            </>
+          )}
         </Stack>
-      ) : (
+      ) : null}
+      {(!hold || picking || hold.state === 'released' || hold.state === 'replaced') && (
         <SlotCalendar
           data={data}
           loading={loading}

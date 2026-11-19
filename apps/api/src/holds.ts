@@ -101,7 +101,6 @@ export async function selectHold(
         current.startsAt.toISOString() === body.startsAt
       )
         return { status: 200, body: { hold: present(current, now), serverNow: now.toISOString() } };
-      if (current) return fail(409, 'SLOT_UNAVAILABLE', 'У вас уже есть действующее Бронирование');
       const type = (
         await client.query<{ duration: number }>(
           'SELECT duration_minutes AS duration FROM event_types WHERE id=$1',
@@ -121,11 +120,14 @@ export async function selectHold(
       );
       if (!slot) return fail(409, 'SLOT_NO_LONGER_OFFERED', 'Слот больше не предлагается');
       const occupied = await client.query(
-        "SELECT id FROM holds WHERE state='active' AND expires_at>$1 AND starts_at<$3 AND ends_at>$2 LIMIT 1",
-        [now, slot.startsAt, slot.endsAt],
+        "SELECT id FROM holds WHERE state='active' AND guest_id<>$4 AND expires_at>$1 AND starts_at<$3 AND ends_at>$2 LIMIT 1",
+        [now, slot.startsAt, slot.endsAt, guestId],
       );
       if (occupied.rowCount)
         return fail(409, 'SLOT_UNAVAILABLE', 'Слот уже занят. Выберите другой.');
+      await client.query("UPDATE holds SET state='replaced' WHERE guest_id=$1 AND state='active'", [
+        guestId,
+      ]);
       const row = (
         await client.query<HoldRow>(
           `INSERT INTO holds(id,guest_id,event_type_id,starts_at,ends_at,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING ${columns}`,
@@ -139,6 +141,56 @@ export async function selectHold(
           ],
         )
       ).rows[0]!;
+      return { status: 200, body: { hold: present(row, now), serverNow: now.toISOString() } };
+    },
+  );
+}
+
+export async function releaseHold(
+  pool: pg.Pool,
+  guestId: string,
+  id: string,
+  key: unknown,
+  body: unknown,
+  clock?: () => Date,
+) {
+  return runOperation(
+    pool,
+    {
+      subject: guestSubject(guestId),
+      key,
+      action: 'release-hold',
+      parameters: { id: id.toLowerCase(), body },
+    },
+    async (client) => {
+      const now = await decisionTime(client, clock);
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length)
+        return {
+          status: 400,
+          body: { code: 'INVALID_REQUEST', message: 'Требуется пустой объект' },
+        };
+      const row = isUuid(id)
+        ? (
+            await client.query<HoldRow>(
+              `SELECT ${columns} FROM holds WHERE guest_id=$1 AND id=$2`,
+              [guestId, id],
+            )
+          ).rows[0]
+        : undefined;
+      if (!row)
+        return {
+          status: 404,
+          body: { code: 'HOLD_UNAVAILABLE', message: 'Бронирование недоступно' },
+        };
+      if (row.state === 'confirmed')
+        return {
+          status: 409,
+          body: { code: 'HOLD_ALREADY_CONFIRMED', message: 'Бронирование уже подтверждено' },
+        };
+      if (row.state === 'active') {
+        await client.query("UPDATE holds SET state='released' WHERE id=$1", [id]);
+        row.state = 'released';
+      }
       return { status: 200, body: { hold: present(row, now), serverNow: now.toISOString() } };
     },
   );

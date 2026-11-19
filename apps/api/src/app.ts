@@ -1,5 +1,5 @@
 import { guest, guestSecret, prepareGuest, requireGuest } from './guests.js';
-import { guestSubject, readHold, selectHold } from './holds.js';
+import { guestSubject, readHold, selectHold, releaseHold } from './holds.js';
 import Fastify from 'fastify';
 import { getSlotAvailability } from './slots.js';
 import pg from 'pg';
@@ -146,6 +146,17 @@ export function createApp(options: {
     const result = await selectHold(
       options.pool,
       requireGuest(await guestId(request.headers.cookie)),
+      request.headers['idempotency-key'],
+      request.body,
+      options.decisionNow,
+    );
+    return reply.code(result.status).send(result.body);
+  });
+  app.post<{ Params: { id: string } }>('/api/holds/:id/release', async (request, reply) => {
+    const result = await releaseHold(
+      options.pool,
+      requireGuest(await guestId(request.headers.cookie)),
+      request.params.id,
       request.headers['idempotency-key'],
       request.body,
       options.decisionNow,

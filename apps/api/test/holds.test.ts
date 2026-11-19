@@ -5,6 +5,7 @@ import {
   getSlotAvailability,
   guestSessionPrepareGuest,
   selectHold,
+  releaseHold,
   getCurrentHold,
   getHold,
   getGuestOperation,
@@ -401,6 +402,356 @@ test('Тайм-аут блокировки остаётся технически
         })
       ).response!.status,
     ).toBe(200);
+  } finally {
+    await f.close();
+  }
+});
+
+test('Успешная замена пересекает собственный Слот и сохраняет исторический результат', async () => {
+  const f = await fixture(undefined, 60);
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const key = randomUUID();
+    const body = { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' };
+    const first = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        body,
+      })
+    ).data!;
+    f.setClock('2026-11-17T04:12:00.000Z');
+    const next = await selectHold({
+      baseUrl: f.baseUrl,
+      headers: { ...headers, 'Idempotency-Key': randomUUID() },
+      body: { ...body, startsAt: '2026-11-17T09:15:00.000Z' },
+    });
+    expect(next.response!.status).toBe(200);
+    expect(next.data!.hold).toMatchObject({
+      state: 'active',
+      expiresAt: '2026-11-17T04:17:00.000Z',
+    });
+    expect(next.data!.hold.id).not.toBe(first.hold.id);
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: first.hold.id } })).data!.hold
+        .state,
+    ).toBe('replaced');
+    expect((await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold).toEqual(
+      next.data!.hold,
+    );
+    expect(
+      (
+        await selectHold({
+          baseUrl: f.baseUrl,
+          headers: { ...headers, 'Idempotency-Key': key },
+          body,
+        })
+      ).data,
+    ).toEqual(first);
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: first.hold.id } })).data!.hold
+        .state,
+    ).toBe('replaced');
+  } finally {
+    await f.close();
+  }
+});
+
+test('Освобождение действует для active и expired; повторы не возобновляют выбор', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    for (const expired of [false, true]) {
+      const selected = await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      });
+      const hold = selected.data!.hold;
+      if (expired) f.setClock(hold.expiresAt);
+      const key = randomUUID();
+      const options = {
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        path: { id: hold.id },
+        body: {},
+      };
+      const released = await releaseHold(options);
+      expect(released.response!.status).toBe(200);
+      expect(released.data!.hold).toMatchObject({
+        id: hold.id,
+        state: 'released',
+        expiresAt: hold.expiresAt,
+      });
+      await f.restart();
+      expect((await releaseHold(options)).data).toEqual(released.data);
+      expect(
+        (
+          await releaseHold({
+            ...options,
+            headers: { ...headers, 'Idempotency-Key': randomUUID() },
+          })
+        ).data!.hold.state,
+      ).toBe('released');
+      expect((await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold!.state).toBe(
+        'released',
+      );
+      expect((await f.read()).data!.slots.some((s) => s.startsAt === hold.startsAt)).toBe(true);
+    }
+  } finally {
+    await f.close();
+  }
+});
+
+async function waitForLock(f: Awaited<ReturnType<typeof fixture>>, count = 1) {
+  await expect
+    .poll(async () =>
+      Number(
+        (
+          await f.pool.query(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'",
+          )
+        ).rows[0].count,
+      ),
+    )
+    .toBe(count);
+}
+
+test('Неудачная замена сохраняет прежний выбор и срок; новый ключ допускает замену после освобождения препятствия', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const a = await f.guest(),
+      b = await f.guest();
+    const select = (headers: typeof a, startsAt: string, key = randomUUID()) =>
+      selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        body: { eventTypeId: f.id, startsAt },
+      });
+    const old = (await select(a, '2026-11-17T09:00:00.000Z')).data!.hold;
+    const obstacle = (await select(b, '2026-11-17T10:00:00.000Z')).data!.hold;
+    const key = randomUUID();
+    expect((await select(a, obstacle.startsAt, key)).error!.code).toBe('SLOT_UNAVAILABLE');
+    expect((await getCurrentHold({ baseUrl: f.baseUrl, headers: a })).data!.hold).toEqual(old);
+    await releaseHold({
+      baseUrl: f.baseUrl,
+      headers: { ...b, 'Idempotency-Key': randomUUID() },
+      path: { id: obstacle.id },
+      body: {},
+    });
+    expect((await select(a, obstacle.startsAt, key)).error!.code).toBe('SLOT_UNAVAILABLE');
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers: a, path: { id: old.id } })).data!.hold,
+    ).toEqual(old);
+    expect((await select(a, obstacle.startsAt)).response!.status).toBe(200);
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers: a, path: { id: old.id } })).data!.hold.state,
+    ).toBe('replaced');
+  } finally {
+    await f.close();
+  }
+});
+
+test('На границе срока новый выбор получает новый id и атомарно заменяет истёкший', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const select = () =>
+      selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      });
+    const first = (await select()).data!.hold;
+    const blocker = await f.pool.connect();
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT id FROM calendar WHERE id=1 FOR UPDATE');
+    const pending = select();
+    try {
+      await waitForLock(f);
+      f.setClock(first.expiresAt);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+    }
+    const second = (await pending).data!.hold;
+    expect(second.id).not.toBe(first.id);
+    expect(second.expiresAt).toBe('2026-11-17T04:20:00.000Z');
+    expect(
+      (await getHold({ baseUrl: f.baseUrl, headers, path: { id: first.id } })).data!.hold.state,
+    ).toBe('replaced');
+  } finally {
+    await f.close();
+  }
+});
+
+test('Две одновременные замены одного Гостя оставляют только последний действующий выбор', async () => {
+  const f = await fixture(undefined, 60);
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const select = (startsAt: string) =>
+      selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt },
+      });
+    const first = (await select('2026-11-17T09:00:00.000Z')).data!.hold;
+    const blocker = await f.pool.connect();
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT id FROM calendar WHERE id=1 FOR UPDATE');
+    const a = select('2026-11-17T09:15:00.000Z');
+    const b = select('2026-11-17T09:30:00.000Z');
+    try {
+      await waitForLock(f, 2);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+    }
+    const results = await Promise.all([a, b]);
+    expect(results.map((r) => r.response!.status)).toEqual([200, 200]);
+    const current = (await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold!;
+    const states = await Promise.all(
+      [first, ...results.map((r) => r.data!.hold)].map(
+        async (h) =>
+          (await getHold({ baseUrl: f.baseUrl, headers, path: { id: h.id } })).data!.hold,
+      ),
+    );
+    expect(states.filter((h) => h.state === 'active').map((h) => h.id)).toEqual([current.id]);
+    expect(states.filter((h) => h.state === 'replaced')).toHaveLength(2);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const releaseFirst of [true, false]) {
+  test(`Освобождение и замена сериализуются: освобождение первым ${releaseFirst}`, async () => {
+    const f = await fixture();
+    try {
+      await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+      const headers = await f.guest();
+      const select = (startsAt: string) =>
+        selectHold({
+          baseUrl: f.baseUrl,
+          headers: { ...headers, 'Idempotency-Key': randomUUID() },
+          body: { eventTypeId: f.id, startsAt },
+        });
+      const first = (await select('2026-11-17T09:00:00.000Z')).data!.hold;
+      const blocker = await f.pool.connect();
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT id FROM calendar WHERE id=1 FOR UPDATE');
+      const release = () =>
+        releaseHold({
+          baseUrl: f.baseUrl,
+          headers: { ...headers, 'Idempotency-Key': randomUUID() },
+          path: { id: first.id },
+          body: {},
+        });
+      const replacement = () => select('2026-11-17T09:15:00.000Z');
+      const one = releaseFirst ? release() : replacement();
+      await waitForLock(f);
+      const two = releaseFirst ? replacement() : release();
+      try {
+        await waitForLock(f, 2);
+      } finally {
+        await blocker.query('ROLLBACK');
+        blocker.release();
+      }
+      const results = await Promise.all([one, two]);
+      expect(results.map((r) => r.response!.status)).toEqual([200, 200]);
+      expect(
+        (await getHold({ baseUrl: f.baseUrl, headers, path: { id: first.id } })).data!.hold.state,
+      ).toBe(releaseFirst ? 'released' : 'replaced');
+      const current = (await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold!;
+      expect(current).toMatchObject({ state: 'active', startsAt: '2026-11-17T09:15:00.000Z' });
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+test('Откат замены и освобождения не меняет старый выбор и не сохраняет результат', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest();
+    const old = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': randomUUID() },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    await f.pool.query(
+      "CREATE FUNCTION reject_operation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$; CREATE TRIGGER reject_operation BEFORE INSERT ON operations FOR EACH ROW EXECUTE FUNCTION reject_operation()",
+    );
+    for (const action of ['replace', 'release']) {
+      const key = randomUUID(),
+        options = { baseUrl: f.baseUrl, headers: { ...headers, 'Idempotency-Key': key } };
+      const result =
+        action === 'replace'
+          ? await selectHold({
+              ...options,
+              body: { eventTypeId: f.id, startsAt: '2026-11-17T10:00:00.000Z' },
+            })
+          : await releaseHold({ ...options, path: { id: old.id }, body: {} });
+      expect(result.response!.status).toBe(503);
+      expect((await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold).toEqual(old);
+      expect(
+        (await getGuestOperation({ baseUrl: f.baseUrl, headers, path: { key } })).data,
+      ).toEqual({ state: 'unknown' });
+    }
+  } finally {
+    await f.close();
+  }
+});
+
+test('Освобождение проверяет принадлежность, пустое тело и общее пространство ключей', async () => {
+  const f = await fixture();
+  try {
+    await f.save('UTC', [{ startMinute: 540, endMinute: 720 }]);
+    const headers = await f.guest(),
+      other = await f.guest(),
+      key = randomUUID();
+    const old = (
+      await selectHold({
+        baseUrl: f.baseUrl,
+        headers: { ...headers, 'Idempotency-Key': key },
+        body: { eventTypeId: f.id, startsAt: '2026-11-17T09:00:00.000Z' },
+      })
+    ).data!.hold;
+    const options = {
+      baseUrl: f.baseUrl,
+      headers: { ...headers, 'Idempotency-Key': key },
+      path: { id: old.id },
+      body: {},
+    };
+    expect((await releaseHold(options)).error!.code).toBe('IDEMPOTENCY_KEY_REUSED');
+    for (const id of [old.id, randomUUID(), 'invalid']) {
+      expect(
+        (
+          await releaseHold({
+            ...options,
+            headers: { ...other, 'Idempotency-Key': randomUUID() },
+            path: { id },
+          })
+        ).error!.code,
+      ).toBe('HOLD_UNAVAILABLE');
+    }
+    expect(
+      (
+        await releaseHold({
+          ...options,
+          headers: { ...headers, 'Idempotency-Key': randomUUID() },
+          body: { extra: true },
+        })
+      ).error!.code,
+    ).toBe('INVALID_REQUEST');
+    expect((await getCurrentHold({ baseUrl: f.baseUrl, headers })).data!.hold).toEqual(old);
   } finally {
     await f.close();
   }

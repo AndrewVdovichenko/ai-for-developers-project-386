@@ -2,6 +2,7 @@ export {
   guestSessionPrepareGuest,
   guestSessionVerifyGuest,
   selectHold,
+  releaseHold,
   getHold,
   getCurrentHold,
   getGuestOperation,
