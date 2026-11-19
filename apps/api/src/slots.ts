@@ -15,5 +15,23 @@ export async function getSlotAvailability(pool: pg.Pool, id: string, now: () => 
       'SELECT time_zone AS "timeZone", days FROM calendar WHERE id = 1',
     )
   ).rows[0]!;
-  return calculateSlots(settings, type.durationMinutes, now());
+  const snapshot = now();
+  const result = calculateSlots(settings, type.durationMinutes, snapshot);
+  const occupied = (
+    await pool.query<{ startsAt: Date; endsAt: Date }>(
+      `SELECT starts_at AS "startsAt", ends_at AS "endsAt" FROM holds WHERE state='active' AND expires_at>$1`,
+      [snapshot],
+    )
+  ).rows;
+  return {
+    ...result,
+    slots: result.slots.filter(
+      (slot) =>
+        !occupied.some(
+          (hold) =>
+            hold.startsAt.getTime() < Date.parse(slot.endsAt) &&
+            hold.endsAt.getTime() > Date.parse(slot.startsAt),
+        ),
+    ),
+  };
 }

@@ -15,7 +15,7 @@ model Session {
 }
 model SessionStatus extends Session { configured: boolean; }
 model ApiError {
-  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED";
+  code: "INVALID_REQUEST" | "OWNER_AUTH_REQUIRED" | "INVALID_PASSWORD" | "ORIGIN_NOT_ALLOWED" | "OWNER_NOT_CONFIGURED" | "LOGIN_RATE_LIMITED" | "TEMPORARILY_UNAVAILABLE" | "INTERNAL_ERROR" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "EVENT_TYPE_NOT_FOUND" | "REVISION_CONFLICT" | "PREVIEW_REQUIRED" | "GUEST_SESSION_REQUIRED" | "HOLD_UNAVAILABLE" | "SLOT_UNAVAILABLE" | "SLOT_STARTED" | "SLOT_NO_LONGER_OFFERED";
   message: string;
   fieldErrors?: { field: string; code: string; message: string }[];
   retryAfterSeconds?: int32;
@@ -49,7 +49,7 @@ model CreateEventType {
 model EventTypeCreated { eventType: EventType; }
 model NotFound { @statusCode statusCode: 404; @body body: ApiError; }
 model Conflict { @statusCode statusCode: 409; @body body: ApiError; }
-model OperationResponse { status: int32; body: EventTypeCreated | AvailabilityResponse | ApiError; }
+model OperationResponse { status: int32; body: EventTypeCreated | AvailabilityResponse | HoldResponse | ApiError; }
 union OperationResult {
   { state: "unknown" },
   { state: "completed"; response: OperationResponse; }
@@ -106,3 +106,22 @@ model SlotAvailability {
 }
 @route("/api/event-types/{id}/availability")
 @get op getSlotAvailability(@path id: string): SlotAvailability | NotFound | Unavailable | InternalError;
+
+model Hold {
+  id: string;
+  eventTypeId: string;
+  startsAt: UtcInstant;
+  endsAt: UtcInstant;
+  expiresAt: UtcInstant;
+  state: "active" | "expired" | "released" | "replaced" | "confirmed";
+  bookingId: string | null;
+}
+model HoldResponse { hold: Hold; serverNow: UtcInstant; }
+@route("/api/guest-session") namespace GuestSession {
+  @get op verifyGuest(): { ready: boolean } | Unavailable | InternalError;
+  @post op prepareGuest(@body body: {}): { ready: boolean } | BadRequest | Forbidden | Unavailable | InternalError;
+}
+@route("/api/holds") @post op selectHold(@header("Idempotency-Key") key: string, @body body: { eventTypeId: string; startsAt: UtcInstant }): HoldResponse | BadRequest | Unauthorized | Forbidden | NotFound | Conflict | Unavailable | InternalError;
+@route("/api/holds/current") @get op getCurrentHold(): { hold: Hold | null; serverNow: UtcInstant } | Unauthorized | Unavailable | InternalError;
+@route("/api/holds/{id}") @get op getHold(@path id: string): HoldResponse | NotFound | Unavailable | InternalError;
+@route("/api/operations/{key}") @get op getGuestOperation(@path key: string): OperationResult | BadRequest | Unauthorized | Unavailable | InternalError;
