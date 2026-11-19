@@ -18,8 +18,6 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
-export const getStatus = <ThrowOnError extends boolean = false>(options?: Options<GetStatusData, ThrowOnError>): RequestResult<GetStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetStatusResponses, unknown, ThrowOnError>({ url: '/', ...options });
-
 export const getBooking = <ThrowOnError extends boolean = false>(options: Options<GetBookingData, ThrowOnError>): RequestResult<GetBookingResponses, GetBookingErrors, ThrowOnError> => (options.client ?? client).get<GetBookingResponses, GetBookingErrors, ThrowOnError>({ url: '/api/bookings/{id}', ...options });
 
 export const eventTypesListEventTypes = <ThrowOnError extends boolean = false>(options?: Options<EventTypesListEventTypesData, ThrowOnError>): RequestResult<EventTypesListEventTypesResponses, EventTypesListEventTypesErrors, ThrowOnError> => (options?.client ?? client).get<EventTypesListEventTypesResponses, EventTypesListEventTypesErrors, ThrowOnError>({ url: '/api/event-types', ...options });
@@ -117,3 +115,5 @@ export const ownerSessionLoginOwner = <ThrowOnError extends boolean = false>(opt
         ...options.headers
     }
 });
+
+export const getStatus = <ThrowOnError extends boolean = false>(options?: Options<GetStatusData, ThrowOnError>): RequestResult<GetStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetStatusResponses, unknown, ThrowOnError>({ url: '/health', ...options });

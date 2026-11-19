@@ -187,24 +187,6 @@ export type WorkingInterval = {
     endMinute: number;
 };
 
-export type GetStatusData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/';
-};
-
-export type GetStatusResponses = {
-    /**
-     * The request has succeeded.
-     */
-    200: {
-        status: 'ok';
-    };
-};
-
-export type GetStatusResponse = GetStatusResponses[keyof GetStatusResponses];
-
 export type GetBookingData = {
     body?: never;
     path: {
@@ -1048,3 +1030,21 @@ export type OwnerSessionLoginOwnerResponses = {
 };
 
 export type OwnerSessionLoginOwnerResponse = OwnerSessionLoginOwnerResponses[keyof OwnerSessionLoginOwnerResponses];
+
+export type GetStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/health';
+};
+
+export type GetStatusResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: {
+        status: 'ok';
+    };
+};
+
+export type GetStatusResponse = GetStatusResponses[keyof GetStatusResponses];

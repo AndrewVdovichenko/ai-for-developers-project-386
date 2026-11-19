@@ -9,7 +9,10 @@ export function config() {
   const databaseUrl =
     process.env.DATABASE_URL ??
     (production ? undefined : 'postgresql://postgres@127.0.0.1:5432/calendar');
-  const origin = process.env.APP_ORIGIN ?? (production ? undefined : 'http://127.0.0.1:5173');
+  const origin =
+    process.env.APP_ORIGIN ??
+    process.env.RENDER_EXTERNAL_URL ??
+    (production ? undefined : 'http://127.0.0.1:5173');
   if (!databaseUrl || !origin) throw new Error('Задайте DATABASE_URL и APP_ORIGIN');
   return {
     databaseUrl,

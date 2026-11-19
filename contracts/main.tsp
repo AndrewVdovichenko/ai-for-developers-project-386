@@ -5,7 +5,7 @@ using TypeSpec.Http;
 @server("http://127.0.0.1:3000", "Локальная разработка")
 namespace Calendar;
 @get
-@route("/")
+@route("/health")
 op getStatus(): { status: "ok" };
 
 model Session {
