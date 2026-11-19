@@ -168,6 +168,14 @@ Container с тем же томом: пароль, сессии, исходн�
 `@typescript/typescript6` под именем `typescript`. Пакет `@typescript/native` —
 алиас TypeScript 7, предоставляющий корневую команду `tsc`; это не nightly-preview.
 
+Для изолированной разработки календаря Слотов и будущей формы Гостя запустите
+`mise exec -- yarn workspace @calendar/web storybook` (порт 6006).
+В панели Storybook переключаются светлая и тёмная схемы Mantine; истории показывают
+доступные Слоты, DST-повтор, переход даты, загрузку, пустоту, ошибку и устаревшие данные.
+Статическая сборка: `mise exec -- yarn workspace @calendar/web build:storybook`.
+Приёмочные проверки интерфейса остаются в Playwright против настоящего API;
+тестовый сервер использует фиксированное время сезонного перевода часов.
+
 ## Проверки качества
 
 `mise run check` запускает проверку генерации, Oxlint, oxfmt, TypeScript, Knip,

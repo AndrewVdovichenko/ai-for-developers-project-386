@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { EventType } from '@calendar/api-client';
 import { readType } from '../event-types-api';
+import { BookingCalendar } from '../BookingCalendar';
 import { EventTypeCard } from '../EventTypeCard';
 
 export function BookingPage() {
@@ -45,9 +46,7 @@ function BookingDetails({ id }: { id: string }) {
         ) : type ? (
           <>
             <EventTypeCard type={type} />
-            <Alert color="teal" title="Здесь появится календарь">
-              Выбор дня и&nbsp;слота появится на&nbsp;следующем этапе.
-            </Alert>
+            <BookingCalendar id={id} />
           </>
         ) : (
           <Loader aria-label="Загружаем тип встречи" />

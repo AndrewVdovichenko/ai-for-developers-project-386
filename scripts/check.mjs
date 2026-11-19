@@ -13,7 +13,7 @@ const commands = [
   ['yarn', ['check:unused']],
   ['yarn', ['check:architecture']],
   ['yarn', ['check:versions']],
-  ['betterleaks', ['dir', '.', '--redact']],
+  ['betterleaks', ['dir', '.', '--redact', '--config', '.betterleaks.toml']],
   [
     'jactionlint',
     ['--strict-exit', '--no-online', '--shellcheck=', ...workflows, '.github/dependabot.yml'],

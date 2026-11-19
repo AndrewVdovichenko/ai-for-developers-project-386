@@ -85,6 +85,25 @@ export type SessionStatus = Session & {
     configured: boolean;
 };
 
+export type Slot = {
+    startsAt: UtcInstant;
+    endsAt: UtcInstant;
+};
+
+export type SlotAvailability = {
+    configured: boolean;
+    serverNow: UtcInstant;
+    timeZone: string | null;
+    windowStartsAt: UtcInstant | null;
+    windowEndsAt: UtcInstant | null;
+    slots: Array<Slot>;
+};
+
+/**
+ * Concrete UTC instants always include milliseconds and Z.
+ */
+export type UtcInstant = string;
+
 export type WeeklyDay = {
     weekday: number;
     intervals: Array<WorkingInterval>;
@@ -178,6 +197,41 @@ export type EventTypesGetEventTypeResponses = {
 };
 
 export type EventTypesGetEventTypeResponse = EventTypesGetEventTypeResponses[keyof EventTypesGetEventTypeResponses];
+
+export type GetSlotAvailabilityData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/event-types/{id}/availability';
+};
+
+export type GetSlotAvailabilityErrors = {
+    /**
+     * The server cannot find the requested resource.
+     */
+    404: ApiError;
+    /**
+     * Server error
+     */
+    500: ApiError;
+    /**
+     * Service unavailable.
+     */
+    503: ApiError;
+};
+
+export type GetSlotAvailabilityError = GetSlotAvailabilityErrors[keyof GetSlotAvailabilityErrors];
+
+export type GetSlotAvailabilityResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: SlotAvailability;
+};
+
+export type GetSlotAvailabilityResponse = GetSlotAvailabilityResponses[keyof GetSlotAvailabilityResponses];
 
 export type OwnerAvailabilityGetAvailabilityData = {
     body?: never;

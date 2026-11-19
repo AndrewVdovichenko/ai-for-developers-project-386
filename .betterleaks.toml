@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated Storybook vendor assets; source and stories remain scanned"
+paths = ['''(^|/)apps/web/dist/storybook/''']
