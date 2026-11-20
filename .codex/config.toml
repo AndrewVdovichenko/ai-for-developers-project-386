@@ -1,5 +1,3 @@
-[mcp_servers.render]
-url = "https://mcp.render.com/mcp"
-
-[mcp_servers.render.oauth]
-client_id = "codex"
+[mcp_servers.railway]
+args = ["mcp"]
+command = "railway"
