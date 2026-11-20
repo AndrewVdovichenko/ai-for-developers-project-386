@@ -1,3 +1,0 @@
-[mcp_servers.railway]
-args = ["mcp"]
-command = "railway"
