@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.5.0...v0.6.0) (2026-11-20)
+
+
+### Новые возможности
+
+* заменить Render на Railway в конфигурации деплоя ([#36](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/36)) ([56a7ef6](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/56a7ef6f065e72d42fc3efd1b8118487f805dda5))
+* описать бесплатный деплой Render ([#36](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/36)) ([a8863ea](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/a8863ea1f24336aa3ec0b7c24245502e8eab24cf))
+* подготовить Docker и Railway MCP для деплоя ([#36](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/36)) ([cf3058c](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/cf3058cf79c655f292a9b184dbad8a1cc810a7bb))
+* подготовить Docker и Render MCP для деплоя ([#36](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/36)) ([5aac4c1](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/5aac4c1cc1e6560a155800690e940e073ef2682f))
+
 ## [0.5.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.4.0...v0.5.0) (2026-11-19)
 
 
