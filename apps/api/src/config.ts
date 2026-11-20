@@ -14,10 +14,13 @@ export function config() {
     : undefined;
   const origin =
     process.env.APP_ORIGIN ?? railwayOrigin ?? (production ? undefined : 'http://127.0.0.1:5173');
-  if (!databaseUrl || !origin) throw new Error('Задайте DATABASE_URL и APP_ORIGIN');
+  if (!databaseUrl || !origin) throw new Error('Задайте DATABASE_URL и APP_ORIGIN');
   return {
     databaseUrl,
     origin,
     trustProxy: process.env.TRUSTED_PROXIES?.split(',').filter(Boolean),
+    // Demo mode: without an explicit DATABASE_URL the server starts without a
+    // database, and therefore without a schema check at boot.
+    schemaCheck: process.env.DATABASE_URL !== undefined,
   };
 }
