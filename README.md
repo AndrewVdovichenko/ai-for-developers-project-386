@@ -111,10 +111,13 @@ SQL — 5 с, вся транзакция — 10 с через `transaction_t
 и SQL-миграции. Проект Railway включает веб-сервис, собираемый из корневой
 Dockerfile, и управляемую базу PostgreSQL 18; их связывает ссылка
 `${{Postgres.DATABASE_URL}}`, проверка живости — `/health`. При старте
-контейнер применяет миграции и запускает сервер на порту из `PORT`; ему нужны
-`DATABASE_URL` и `APP_ORIGIN` с HTTPS в production. На Railway
-`APP_ORIGIN` можно не задавать: используется `RAILWAY_PUBLIC_DOMAIN` со схемой
-`https://`. Для локальной проверки с PostgreSQL задайте
+контейнер применяет миграции, если задан `DATABASE_URL`, и запускает
+сервер на порту из `PORT`. Production-режим включает переменная
+`NODE_ENV=production` из конфигурации сервиса — в образе её нет; в этом
+режиме обязательны `DATABASE_URL` и `APP_ORIGIN` с HTTPS, а без них образ
+стартует в demo-режиме без БД (так его запускает hexlet-check). На Railway
+`APP_ORIGIN` можно не задавать: используется `RAILWAY_PUBLIC_DOMAIN` со схемой
+`https://`. Для локальной проверки с PostgreSQL задайте
 `APP_ORIGIN=http://localhost:8080` и `PORT=8080`; production требует HTTPS,
 поэтому локальный HTTP-запуск выполняйте с `NODE_ENV=development`.
 
