@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.6.0...v0.6.1) (2026-11-20)
+
+
+### Исправления
+
+* образа запускается без БД, production включает переменная ([#41](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/41)) ([d5e7b03](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/d5e7b036ebab5c82a1170bf5dd38cb1f67a4001f))
+* сервер стартует без БД в demo-режиме ([#41](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/issues/41)) ([ce25d6a](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/commit/ce25d6a93a9e68549fb19bc1125bb46b8a194554))
+
 ## [0.6.0](https://github.com/AndrewVdovichenko/ai-for-developers-project-386/compare/v0.5.0...v0.6.0) (2026-11-20)
 
 
