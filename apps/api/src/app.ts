@@ -16,6 +16,7 @@ export function createApp(options: {
   now?: () => Date;
   trustProxy?: string[];
   decisionNow?: () => Date;
+  schemaCheck?: boolean;
 }) {
   const now = options.now ?? (() => new Date());
   const origin = new URL(options.origin);
@@ -40,7 +41,7 @@ export function createApp(options: {
     },
     trustProxy: options.trustProxy ?? false,
   });
-  app.addHook('onReady', () => checkSchema(options.pool));
+  if (options.schemaCheck ?? true) app.addHook('onReady', () => checkSchema(options.pool));
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AccessError) {
       if (error.retryAfterSeconds !== undefined)

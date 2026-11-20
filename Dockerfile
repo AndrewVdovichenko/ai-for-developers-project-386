@@ -12,7 +12,7 @@ RUN yarn build && yarn workspaces focus @calendar/api --production
 
 FROM node:26.13.1-bookworm-slim
 
-ENV NODE_ENV=production SERVE_STATIC=1 HOST=0.0.0.0
+ENV SERVE_STATIC=1 HOST=0.0.0.0
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
@@ -24,4 +24,4 @@ COPY --from=build /app/packages/api-client/package.json ./packages/api-client/pa
 
 USER node
 EXPOSE 3000
-CMD ["sh", "-c", "node apps/api/dist/cli.js migrate && exec node apps/api/dist/server.js"]
+CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then node apps/api/dist/cli.js migrate || exit 1; fi && exec node apps/api/dist/server.js"]

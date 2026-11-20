@@ -5,7 +5,12 @@ import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'node:url';
 const settings = config();
 const pool = createPool(settings.databaseUrl);
-const app = createApp({ pool, origin: settings.origin, trustProxy: settings.trustProxy });
+const app = createApp({
+  pool,
+  origin: settings.origin,
+  trustProxy: settings.trustProxy,
+  schemaCheck: settings.schemaCheck,
+});
 if (process.env.SERVE_STATIC === '1') {
   await app.register(fastifyStatic, {
     root: fileURLToPath(new URL('../../web/dist/', import.meta.url)),
