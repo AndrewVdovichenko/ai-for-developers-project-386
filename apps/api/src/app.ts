@@ -93,7 +93,7 @@ export function createApp(options: {
           .send({ code: 'OWNER_AUTH_REQUIRED', message: 'Войдите в раздел Владельца' });
     }
   });
-  app.get('/', async () => {
+  app.get('/health', async () => {
     await options.pool.query('SELECT 1');
     return { status: 'ok' };
   });

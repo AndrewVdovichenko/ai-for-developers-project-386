@@ -4,24 +4,6 @@ info:
   version: 0.0.0
 tags: []
 paths:
-  /:
-    get:
-      operationId: getStatus
-      parameters: []
-      responses:
-        '200':
-          description: The request has succeeded.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    enum:
-                      - ok
-                required:
-                  - status
   /api/bookings/{id}:
     get:
       operationId: getBooking
@@ -940,6 +922,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /health:
+    get:
+      operationId: getStatus
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                required:
+                  - status
 components:
   schemas:
     AffectedHold:

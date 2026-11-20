@@ -2,7 +2,7 @@ import { getStatus } from '@calendar/api-client';
 import { expect, test } from 'vitest';
 import { createApp } from '../src/app.js';
 import { testDatabase } from './database.js';
-test('сервер запускается и отвечает 200 на GET / через SDK', async () => {
+test('сервер запускается и отвечает 200 на GET /health через SDK', async () => {
   const db = await testDatabase();
   await db.migrate();
   const app = createApp({ pool: db.pool, origin: 'http://127.0.0.1:5173' });
